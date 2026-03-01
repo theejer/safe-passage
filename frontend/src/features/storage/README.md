@@ -40,6 +40,7 @@ Behavior:
 - Single-flight initialization (`initPromise`) prevents concurrent schema races.
 - Initialization timeout is guarded (`INIT_TIMEOUT_MS`).
 - Logs are emitted for start, completion, and failures.
+- On web, a dedicated in-memory adapter is used (`offlineDb.web.ts`) to avoid OPFS access-handle conflicts during dev/runtime.
 
 ## API Quick Reference
 

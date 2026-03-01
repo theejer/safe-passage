@@ -6,6 +6,9 @@ import {
   listTrips as listLocalTrips,
   upsertTrip,
 } from "@/features/storage/services/offlineDb";
+import { setItem } from "@/features/storage/services/localStore";
+
+const ACTIVE_TRIP_ID_KEY = "active_trip_id";
 
 type TripWire = {
   id: string;
@@ -59,9 +62,11 @@ export async function createTrip(payload: TripCreateInput) {
     const wireTrip = response as TripWire;
     const normalized = fromWireTrip(wireTrip);
     await upsertTrip(normalized);
+    await setItem(ACTIVE_TRIP_ID_KEY, normalized.id);
     return normalized;
   } catch {
     await upsertTrip(localTrip);
+    await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
     await enqueueSyncJob({
       entityType: "trip",
       entityId: localTrip.id,

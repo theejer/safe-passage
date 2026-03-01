@@ -129,6 +129,10 @@ py -3 -m pip freeze > requirements.lock.txt
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
 
+## Focused Guides
+
+- Heartbeat backend integration and controls: `HEARTBEAT.md`
+
 ## Notes
 
 - This backend is scaffold-first: routes/services/models are intentionally minimal with comments for fast agentic iteration.

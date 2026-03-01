@@ -16,3 +16,18 @@ A dev route is available at `/dev/storage-test`.
 2. Open route in Expo Router: `/dev/storage-test`
 3. Tap **Run SQLite Smoke Test**
 4. Review check-by-check pass/fail output on screen
+
+## Heartbeat runtime smoke test
+
+- File: `tests/heartbeat/heartbeatRuntime.smoke.ts`
+- Validates heartbeat queue + replay flow and heartbeat-enabled trip gating.
+- Intended runtime: Expo app on simulator/device (not plain Node.js).
+
+### Run path
+
+A dev route is available at `/dev/heartbeat-test`.
+
+1. Start app: `npm start`
+2. Open route in Expo Router: `/dev/heartbeat-test`
+3. Tap **Run Heartbeat Smoke Test**
+4. Review live logs and per-check pass/fail output
