@@ -11,6 +11,8 @@ This skill provides a description of how to identify the language and frameworks
 
 This includes web and mobile contexts. For React Native or offline-first apps, include device-local data handling, mobile permission boundaries, and incident/emergency workflow abuse risks in the review scope.
 
+For personal safety products like SafePassage, include emergency escalation abuse risk (false alerts/contact spam), offline evidence tamper risk before sync, sensitive location/identity retention controls, and degraded-mode safety behavior when model/map/network dependencies are unavailable.
+
 This information, if present, can be used to write new secure by default code, or to passively detect major issues within existing code, or (if requested by the user) provide a vulnerability report and suggest fixes.
 
 ## Workflow
@@ -20,6 +22,8 @@ The initial step for this skill is to identify ALL languages and ALL frameworks 
 Then check this skill's references directory to see if there are any relevant documentation for the language and or frameworks. Make sure you read ALL reference files which relate to the specific framework or language. The format of the filenames is `<language>-<framework>-<stack>-security.md`. You should also check if there is a `<language>-general-<stack>-security.md` which is agnostic to the framework you may be using.
 
 If working on a web application which includes a frontend and a backend, make sure you have checked for reference documents for BOTH the frontend and backend!
+
+If working on SafePassage backend slices, include `python-flask-web-server-security.md` for Flask REST implementations and `javascript-express-web-server-security.md` for Node/Express implementations.
 
 If you are asked to make a web app which will include both a frontend and backend, but the frontend framework is not specified, also check out `javascript-general-web-frontend-security.md`. It is important that you understand how to secure both the frontend and backend.
 
@@ -43,6 +47,34 @@ From there it can operate in a few ways.
 
 For React Native tasks, include `javascript-typescript-react-native-mobile-security.md` when applicable.
 
+## SafePassage Security Control Baseline
+
+When implementing or reviewing this project, apply these controls by default unless explicitly overridden by project requirements:
+
+1. Data classification
+- Treat exact GPS traces, emergency contacts, itinerary plans, medical details, incident media, and user identifiers as sensitive.
+
+2. Device-local protections
+- Prefer encrypted storage for sensitive data and media.
+- Minimize plaintext persistence windows and avoid logging sensitive payloads.
+
+3. Alert and escalation integrity
+- Authenticate heartbeat/alert/sync APIs.
+- Rate-limit and deduplicate escalation notifications.
+- Protect against replay/tampering for incident and heartbeat events where feasible.
+
+4. Offline-first safety behavior
+- Emergency workflows must remain operable offline.
+- If model/map/network is unavailable, ensure deterministic template fallback is present.
+
+5. Least privilege and permissions
+- Request only required device permissions (location, camera, mic) at feature-use time.
+- Fail safely when permissions are denied.
+
+6. Sync and retention
+- Queue offline incidents with durable retry.
+- Make retention transparent and user-controlled (delete/export semantics if implemented).
+
 # Overrides
 
 While these references contain the security best practices for languages and frameworks, customers may have cases where they need to bypass or override these practices. Pay attention to specific rules and instructions in the project's documentation and prompt files which may require you to override certain best practices. When overriding a best practice, you MAY report it to the user, but do not fight with them. If a security best practice needs to be bypassed / ignored for some project specific reason, you can also suggest to add documentation about this to the project so it is clear why the best practice is not being followed and to follow that bypass in the future.
@@ -54,6 +86,13 @@ When producing a report, you should write the report as a markdown file in `secu
 The report should have a short executive summary at the top.
 
 The report should be clearly delineated into multiple sections based on severity of the vulnerability. The report should focus on the most critical findings as these have the highest impact for the user. All findings should be noted with an numeric ID to make them easier to reference.
+
+For SafePassage reports, group findings under:
+- Emergency Workflow Safety
+- Offline Data Security
+- Alerting and Escalation Integrity
+- API/Auth Boundaries
+- Privacy and Retention
 
 For critical findings include a one sentence impact statement.
 

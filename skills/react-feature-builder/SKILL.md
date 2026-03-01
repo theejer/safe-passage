@@ -7,6 +7,8 @@ description: Implement and verify web React features in Create React App style p
 
 Implement web React feature work in a predictable sequence that minimizes regressions and keeps edits scoped.
 
+In this repository, this is a secondary skill for legacy/transitional web surfaces only. The primary product target is React Native mobile for SafePassage Bihar Travel Safety Edition.
+
 ## Workflow
 1. Inspect impacted React files and existing tests before editing.
 2. Implement the smallest change that satisfies the request.
@@ -20,6 +22,8 @@ Implement web React feature work in a predictable sequence that minimizes regres
 - Document assumptions before making risky or ambiguous changes.
 - Do not change unrelated files during feature delivery.
 - In this repository, use this skill only for explicitly requested legacy web maintenance.
+- Do not move core safety logic into web-only paths unless explicitly requested.
+- Keep behavior contracts aligned with mobile-first pillars when touching shared docs/logic (PREVENTION/CURE/MITIGATION).
 
 ## Verification
 - Use `scripts/run-react-checks.ps1` for deterministic checks.

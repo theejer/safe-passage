@@ -7,14 +7,24 @@ description: Build and verify React Native features styled with Tailwind utility
 
 Implement mobile feature work in a strict, low-regression workflow for React Native projects using Tailwind-style utility classes via NativeWind.
 
+This repository's primary product design is SafePassage Bihar Travel Safety Edition, with three core pillars:
+- PREVENTION: itinerary risk + connectivity analysis
+- CURE: connectivity-aware emergency anomaly detection and escalation
+- MITIGATION: offline emergency guidance and incident capture
+
 ## Workflow
-1. Inspect impacted screens/components, navigation paths, and related tests.
-2. Confirm current behavior before edits, including style behavior on different screen sizes and offline state behavior when relevant.
-3. Implement the smallest React Native change that satisfies the request.
-4. Apply or adjust NativeWind utility classes for styling updates.
-5. For SafePassage-critical flows (emergency, GPS/location, local storage, contacts, on-device AI context), invoke `security-best-practices` guidance by default.
-6. Run verification checks (tests, lint/type checks, and build health checks when available).
-7. Summarize modified files, assumptions, and command outcomes.
+1. Classify the request by pillar (PREVENTION, CURE, MITIGATION, or shared infrastructure).
+2. Inspect impacted screens/components, navigation paths, local storage, and related tests.
+3. Define behavior contract before editing:
+	- online behavior
+	- offline/degraded behavior
+	- fallback behavior (missing map/model/data)
+	- escalation behavior (if alerting is involved)
+4. Implement the smallest React Native change that satisfies the request.
+5. Apply or adjust NativeWind utility classes for styling updates.
+6. For SafePassage-critical flows (emergency, GPS/location, local storage, contacts, on-device AI context, alerting), invoke `security-best-practices` guidance by default.
+7. Run verification checks (tests, lint/type checks, and build health checks when available).
+8. Summarize modified files, assumptions, and command outcomes.
 
 ## Constraints
 - Avoid broad refactors unless explicitly requested.
@@ -23,6 +33,9 @@ Implement mobile feature work in a strict, low-regression workflow for React Nat
 - Document assumptions before risky changes, especially around navigation and platform behavior.
 - Define degraded-mode behavior for offline or missing-data conditions.
 - For emergency workflows, keep user steps deterministic, clear, and fail-safe.
+- Keep Bihar context explicit where relevant (district names, local emergency services, connectivity-poor routes).
+- Never block emergency UX on network availability.
+- Maintain durable local queue behavior for events/logs that sync on reconnect.
 - Do not change unrelated files.
 
 ## Styling Rules
@@ -36,6 +49,13 @@ Implement mobile feature work in a strict, low-regression workflow for React Nat
 - Run with `-WhatIf` to preview commands.
 - When scripts are missing in `package.json`, the checker reports and skips them.
 - `expo-doctor` should run only for Expo projects.
+
+## Agentic Coding Checklist
+- Trace each change to a user scenario (for example, offline breakdown guidance, missed check-ins, itinerary import).
+- Verify one happy path plus one degraded path per changed feature.
+- Validate storage and retry behavior if writing emergency/incident data.
+- For CURE logic, include threshold rationale and false-positive controls in notes/tests.
+- For MITIGATION logic, verify emergency entry works while offline and under low battery/device constraints when possible.
 
 ## References
 - Read `references/react-native-nativewind-workflow.md` for setup assumptions, implementation order, and failure handling.
