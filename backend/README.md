@@ -55,6 +55,11 @@ $env:ANTHROPIC_API_KEY=""
 $env:TWILIO_ACCOUNT_SID=""
 $env:TWILIO_AUTH_TOKEN=""
 $env:TWILIO_FROM_NUMBER=""
+
+# Heartbeat watchdog scheduling
+$env:ENABLE_HEARTBEAT_SCHEDULER="0"
+$env:HEARTBEAT_WATCHDOG_INTERVAL_MINUTES="5"
+$env:HEARTBEAT_WATCHDOG_KEY=""
 ```
 
 ## Run the Backend
@@ -120,7 +125,9 @@ py -3 -m pip freeze > requirements.lock.txt
 - `PUT /trips/<trip_id>/itinerary`
 - `GET /trips/<trip_id>/itinerary`
 - `POST /itinerary/analyze`
+- `POST /heartbeat` (JWT required, returns 204)
 - `POST /heartbeats`
+- `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
 
 ## Notes
 

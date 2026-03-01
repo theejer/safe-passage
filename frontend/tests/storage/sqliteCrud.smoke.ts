@@ -119,6 +119,7 @@ export async function runSqliteCrudSmokeTest(options?: SmokeOptions): Promise<Sm
       title: "SQLite Smoke Trip",
       startDate: "2026-03-02",
       endDate: "2026-03-05",
+      heartbeatEnabled: true,
     };
 
     await upsertTrip(trip);

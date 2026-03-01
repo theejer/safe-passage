@@ -58,6 +58,11 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+async function hasColumn(db: SQLiteDatabase, tableName: string, columnName: string): Promise<boolean> {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName})`);
+  return rows.some((row) => row.name === columnName);
+}
+
 export async function initializeOfflineDb() {
   if (initialized) {
     return { initialized: true as const, dbName: DB_NAME, schemaVersion: SCHEMA_VERSION };
@@ -84,6 +89,7 @@ export async function initializeOfflineDb() {
         title TEXT NOT NULL,
         start_date TEXT NOT NULL,
         end_date TEXT NOT NULL,
+        heartbeat_enabled INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         sync_status TEXT NOT NULL DEFAULT 'pending'
@@ -162,6 +168,21 @@ export async function initializeOfflineDb() {
       await withTimeout(db.execAsync(statements[index]), INIT_TIMEOUT_MS, `schema statement ${index + 1}`);
     }
 
+    const hasHeartbeatEnabledColumn = await withTimeout(
+      hasColumn(db, "trips", "heartbeat_enabled"),
+      INIT_TIMEOUT_MS,
+      "trips heartbeat_enabled introspection"
+    );
+
+    if (!hasHeartbeatEnabledColumn) {
+      await withTimeout(
+        db.execAsync("ALTER TABLE trips ADD COLUMN heartbeat_enabled INTEGER NOT NULL DEFAULT 1"),
+        INIT_TIMEOUT_MS,
+        "trips heartbeat_enabled migration"
+      );
+      console.log("[offlineDb] migrated trips.heartbeat_enabled column");
+    }
+
     await withTimeout(setMetadata("schema_version", SCHEMA_VERSION), INIT_TIMEOUT_MS, "schema metadata write");
 
     initialized = true;
@@ -210,17 +231,27 @@ export async function upsertTrip(trip: Trip) {
   const createdAt = nowIso();
   await db.runAsync(
     `
-      INSERT INTO trips (id, user_id, title, start_date, end_date, created_at, updated_at, sync_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+      INSERT INTO trips (id, user_id, title, start_date, end_date, heartbeat_enabled, created_at, updated_at, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       ON CONFLICT(id) DO UPDATE SET
         user_id = excluded.user_id,
         title = excluded.title,
         start_date = excluded.start_date,
         end_date = excluded.end_date,
+        heartbeat_enabled = excluded.heartbeat_enabled,
         updated_at = excluded.updated_at,
         sync_status = 'pending'
     `,
-    [trip.id, trip.userId, trip.title, trip.startDate, trip.endDate, createdAt, createdAt]
+    [
+      trip.id,
+      trip.userId,
+      trip.title,
+      trip.startDate,
+      trip.endDate,
+      trip.heartbeatEnabled ? 1 : 0,
+      createdAt,
+      createdAt,
+    ]
   );
 }
 
@@ -232,8 +263,9 @@ export async function listTrips(userId: string) {
     title: string;
     start_date: string;
     end_date: string;
+    heartbeat_enabled: number;
   }>(
-    "SELECT id, user_id, title, start_date, end_date FROM trips WHERE user_id = ? ORDER BY start_date DESC",
+    "SELECT id, user_id, title, start_date, end_date, heartbeat_enabled FROM trips WHERE user_id = ? ORDER BY start_date DESC",
     [userId]
   );
 
@@ -243,6 +275,7 @@ export async function listTrips(userId: string) {
     title: row.title,
     startDate: row.start_date,
     endDate: row.end_date,
+    heartbeatEnabled: row.heartbeat_enabled === 1,
   })) as Trip[];
 }
 

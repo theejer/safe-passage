@@ -13,6 +13,11 @@ type TripWire = {
   title: string;
   start_date: string;
   end_date: string;
+  heartbeat_enabled?: boolean;
+};
+
+type TripCreateInput = Pick<Trip, "userId" | "title" | "startDate" | "endDate"> & {
+  heartbeatEnabled?: boolean;
 };
 
 function fromWireTrip(value: TripWire): Trip {
@@ -22,20 +27,22 @@ function fromWireTrip(value: TripWire): Trip {
     title: value.title,
     startDate: value.start_date,
     endDate: value.end_date,
+    heartbeatEnabled: value.heartbeat_enabled ?? true,
   };
 }
 
-function toWireTrip(payload: Pick<Trip, "userId" | "title" | "startDate" | "endDate">) {
+function toWireTrip(payload: TripCreateInput) {
   return {
     user_id: payload.userId,
     title: payload.title,
     start_date: payload.startDate,
     end_date: payload.endDate,
+    heartbeat_enabled: payload.heartbeatEnabled ?? true,
   };
 }
 
 // CRUD-ish API wrappers for trip metadata.
-export async function createTrip(payload: Pick<Trip, "userId" | "title" | "startDate" | "endDate">) {
+export async function createTrip(payload: TripCreateInput) {
   await initializeOfflineDb();
 
   const localTrip: Trip = {
@@ -44,6 +51,7 @@ export async function createTrip(payload: Pick<Trip, "userId" | "title" | "start
     title: payload.title,
     startDate: payload.startDate,
     endDate: payload.endDate,
+    heartbeatEnabled: payload.heartbeatEnabled ?? true,
   };
 
   try {

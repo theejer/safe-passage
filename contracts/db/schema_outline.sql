@@ -43,6 +43,7 @@ create table if not exists trips (
   title text not null,
   start_date date not null,
   end_date date not null,
+  heartbeat_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -52,6 +53,22 @@ create table if not exists itineraries (
   trip_id uuid not null unique references trips(id) on delete cascade,
   itinerary_json jsonb not null,
   source text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists itinerary_segments (
+  id uuid primary key,
+  trip_id uuid not null references trips(id) on delete cascade,
+  segment_order integer not null,
+  segment_label text,
+  start_place text,
+  end_place text,
+  expected_offline_minutes integer not null check (expected_offline_minutes >= 0),
+  connectivity_risk text,
+  day_of_week integer,
+  start_time_local time,
+  end_time_local time,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -99,6 +116,26 @@ create table if not exists heartbeats (
   source text,
   emergency_phone text,
   created_at timestamptz not null default now()
+);
+
+create table if not exists traveler_status (
+  id uuid primary key,
+  user_id uuid not null references users(id) on delete cascade,
+  trip_id uuid not null references trips(id) on delete cascade,
+  last_seen_at timestamptz,
+  last_seen_lat double precision,
+  last_seen_lng double precision,
+  last_battery_percent integer,
+  last_network_status text,
+  location_risk text,
+  connectivity_risk text,
+  current_segment_id uuid,
+  current_stage text not null default 'none',
+  monitoring_state text not null default 'active',
+  last_stage_change_at timestamptz,
+  last_evaluated_at timestamptz,
+  updated_at timestamptz not null default now(),
+  unique (user_id, trip_id)
 );
 
 create table if not exists monitoring_expectations (
@@ -194,6 +231,8 @@ create table if not exists incident_sync_jobs (
 -- Index Suggestions
 -- =====================================
 create index if not exists idx_trips_user_id on trips(user_id);
+create index if not exists idx_itinerary_segments_trip_order on itinerary_segments(trip_id, segment_order);
 create index if not exists idx_heartbeats_user_time on heartbeats(user_id, timestamp desc);
+create index if not exists idx_traveler_status_trip_stage on traveler_status(trip_id, current_stage);
 create index if not exists idx_risk_reports_trip_time on risk_reports(trip_id, created_at desc);
 create index if not exists idx_incidents_user_sync_status on incidents(user_id, sync_status);

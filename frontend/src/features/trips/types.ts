@@ -18,5 +18,6 @@ export type Trip = {
   title: string;
   startDate: string;
   endDate: string;
+  heartbeatEnabled: boolean;
   days?: Day[];
 };

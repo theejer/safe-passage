@@ -82,6 +82,7 @@ export type Trip = {
   title: string;
   start_date: string;
   end_date: string;
+  heartbeat_enabled: boolean;
   days?: ItineraryDay[];
 };
 

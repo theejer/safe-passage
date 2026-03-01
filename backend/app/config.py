@@ -28,6 +28,10 @@ class BaseConfig:
     TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
 
+    ENABLE_HEARTBEAT_SCHEDULER = os.getenv("ENABLE_HEARTBEAT_SCHEDULER", "0") == "1"
+    HEARTBEAT_WATCHDOG_INTERVAL_MINUTES = int(os.getenv("HEARTBEAT_WATCHDOG_INTERVAL_MINUTES", "5"))
+    HEARTBEAT_WATCHDOG_KEY = os.getenv("HEARTBEAT_WATCHDOG_KEY", "")
+
 
 class DevelopmentConfig(BaseConfig):
     """Developer-friendly defaults for local execution."""

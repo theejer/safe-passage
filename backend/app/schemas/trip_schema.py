@@ -13,3 +13,4 @@ class TripCreateSchema(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     start_date: str
     end_date: str
+    heartbeat_enabled: bool = True
