@@ -6,6 +6,9 @@ services, and external integrations (Supabase, model provider, alerts).
 
 import os
 
+class Config:
+    SQLALCHEMY_DATABASE_URI = os.getenv("SUPABASE_DB_URL")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 class BaseConfig:
     """Base runtime config shared by local/dev/prod environments."""

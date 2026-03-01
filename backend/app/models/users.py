@@ -12,6 +12,12 @@ def create_user(payload: dict) -> dict:
     return response.data[0] if response.data else {}
 
 
+def get_user_by_id(user_id: str) -> dict:
+    """Fetch a user record by id."""
+    response = get_supabase().table("users").select("*").eq("id", user_id).limit(1).execute()
+    return response.data[0] if response.data else {}
+
+
 def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
     """Update emergency contact details used by notification services."""
     response = (

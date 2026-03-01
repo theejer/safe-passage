@@ -5,6 +5,7 @@ and service operations for PREVENTION data setup.
 """
 
 from flask import Blueprint, jsonify, request
+from pydantic import ValidationError
 
 from app.models.itineraries import get_itinerary, upsert_itinerary
 from app.models.trips import create_trip, list_trips_by_user
@@ -17,7 +18,11 @@ trips_bp = Blueprint("trips", __name__)
 @trips_bp.post("")
 def create_trip_route():
     """Create trip shell before itinerary analysis and monitoring begin."""
-    payload = TripCreateSchema.model_validate(request.get_json(force=True)).model_dump()
+    try:
+        payload = TripCreateSchema.model_validate(request.get_json(force=True)).model_dump()
+    except ValidationError as exc:
+        return jsonify({"error": "invalid trip payload", "details": exc.errors()}), 400
+
     created = create_trip(payload)
     return jsonify(created), 201
 
@@ -26,6 +31,9 @@ def create_trip_route():
 def list_trips_route():
     """List trips for a user (expects `user_id` query parameter)."""
     user_id = request.args.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "user_id query parameter is required"}), 400
+
     trips = list_trips_by_user(user_id)
     return jsonify({"items": trips})
 
@@ -33,7 +41,11 @@ def list_trips_route():
 @trips_bp.put("/<trip_id>/itinerary")
 def update_itinerary_route(trip_id: str):
     """Store normalized itinerary data for a trip."""
-    itinerary = ItinerarySchema.model_validate(request.get_json(force=True)).model_dump()
+    try:
+        itinerary = ItinerarySchema.model_validate(request.get_json(force=True)).model_dump()
+    except ValidationError as exc:
+        return jsonify({"error": "invalid itinerary payload", "details": exc.errors()}), 400
+
     record = upsert_itinerary(trip_id, itinerary)
     return jsonify(record)
 
