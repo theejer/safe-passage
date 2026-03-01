@@ -11,6 +11,9 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "plugins": [
+      "expo-sqlite"
+    ]
   }
 }
