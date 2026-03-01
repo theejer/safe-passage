@@ -1,0 +1,28 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JSYNC",
+  "idempotency_key": "idem_9be123d3-3608-4ea3-b287-d0084cb4550e",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "trip_id": "trp_2aeb3d2e-17db-4ce7-91f2-f01f0a2b0d44",
+  "incidents": [
+    {
+      "incident_id": "inc_44ca44d1-cd2d-40ed-b6f2-6a40fce7df59",
+      "scenario_key": "breakdown",
+      "occurred_at": "2026-04-04T11:20:00Z",
+      "gps_lat": 24.7541,
+      "gps_lng": 84.3795,
+      "notes": "Jeep stalled in no-signal stretch.",
+      "severity": "moderate"
+    }
+  ],
+  "attachments": [
+    {
+      "attachment_id": "att_3cc2e3f8-4dfa-4304-87ed-e81fdf6bf9cb",
+      "incident_id": "inc_44ca44d1-cd2d-40ed-b6f2-6a40fce7df59",
+      "type": "photo",
+      "local_uri": "file:///data/user/0/app/cache/incidents/photo1.jpg",
+      "captured_at": "2026-04-04T11:22:00Z"
+    }
+  ],
+  "retry_count": 1
+}

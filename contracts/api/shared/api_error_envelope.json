@@ -1,0 +1,18 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JEXAMPLE",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid itinerary payload",
+    "retryable": false,
+    "details": [
+      {
+        "field": "days[0].date",
+        "issue": "Expected ISO date"
+      }
+    ]
+  },
+  "meta": {
+    "timestamp": "2026-03-01T12:30:00Z"
+  }
+}

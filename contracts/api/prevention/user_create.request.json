@@ -1,0 +1,11 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JUSER",
+  "full_name": "Aarti Singh",
+  "phone": "+919876543210",
+  "emergency_contact": {
+    "name": "Ravi Singh",
+    "phone": "+919123456789",
+    "email": "ravi@example.com"
+  }
+}

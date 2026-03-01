@@ -1,0 +1,13 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JEXAMPLE",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "device": {
+    "device_id": "dev_a1f36931-a0bb-49b3-b0bb-f35e91f9aa67",
+    "platform": "android",
+    "app_version": "0.1.0",
+    "os_version": "14",
+    "locale": "en-IN",
+    "push_token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
+  }
+}

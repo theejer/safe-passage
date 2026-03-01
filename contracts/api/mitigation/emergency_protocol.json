@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.0.0",
+  "scenario_key": "breakdown",
+  "title": "Vehicle Breakdown",
+  "steps": [
+    "Stay with vehicle and avoid walking into isolated areas.",
+    "Use visible signals (flashlight/reflective cloth).",
+    "Record location, time, and vehicle status.",
+    "Attempt contact when network returns."
+  ],
+  "fallback_templates": {
+    "calm_message": "You are doing the right thing. Stay visible and conserve battery.",
+    "next_action": "Move only when safe transport is confirmed."
+  },
+  "local_numbers": {
+    "emergency_112": "112",
+    "ambulance_108": "108"
+  }
+}

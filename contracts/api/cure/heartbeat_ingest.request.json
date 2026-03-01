@@ -1,0 +1,17 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JHB",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "trip_id": "trp_2aeb3d2e-17db-4ce7-91f2-f01f0a2b0d44",
+  "timestamp": "2026-04-04T11:40:00Z",
+  "gps": {
+    "lat": 24.7541,
+    "lng": 84.3795,
+    "accuracy_meters": 28
+  },
+  "battery_percent": 42,
+  "network_status": "offline",
+  "offline_minutes": 210,
+  "emergency_phone": "+919123456789",
+  "source": "background_fetch"
+}
