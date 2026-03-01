@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SafePassage",
+    "slug": "safepassage-frontend",
+    "scheme": "safepassage",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

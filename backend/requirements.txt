@@ -3,7 +3,9 @@ Flask==3.1.0
 gunicorn==23.0.0
 
 # Data validation and environment handling
-pydantic==2.11.1
+# NOTE: Keep pydantic flexible for Python 3.14 so pip can resolve
+# a wheel-supported build (older strict pins may trigger Rust source builds).
+pydantic>=2.11.7,<3
 email-validator==2.2.0
 python-dotenv==1.0.1
 

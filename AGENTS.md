@@ -5,8 +5,10 @@
 - SafePassage is a mobile-first safety product for low-connectivity travel in Bihar, India.
 - Product shape follows three pillars: **PREVENTION** (itinerary risk analysis), **CURE** (connectivity-aware offline anomaly alerts), **MITIGATION** (offline emergency guidance).
 - Primary target implementation is Expo-managed React Native; backend services may be Node/Express or Flask REST based on the active implementation slice.
+- Active Expo frontend scaffold folder: `frontend`.
 - Styling direction: Tailwind utility classes through NativeWind.
 - `my-app` is the active app folder and should be treated as the primary mobile app surface.
+- `my-app` may remain as a legacy surface; prioritize `frontend` for current agentic RN implementation work.
 - Treat this file as the authoritative instruction source for this repository unless a deeper `AGENTS.md` is intentionally added later.
 
 ## SafePassage Operating Mode
@@ -33,7 +35,7 @@
 - Phrase-helper and crisis guidance must fail gracefully when on-device model is unavailable (template fallback).
 
 ## Command Contract
-Run app commands from the active app folder (`my-app`):
+Run app commands from the active Expo app folder (`frontend`) unless explicitly working on legacy app surfaces:
 - `npm start`
 - `npm test`
 - `npm run lint` (when available)
