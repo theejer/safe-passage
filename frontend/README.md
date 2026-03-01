@@ -28,3 +28,7 @@ npm run typecheck
 - Route screens should orchestrate hooks/services, not embed heavy logic.
 - Feature hooks own data orchestration and offline fallback behavior.
 - Services are the boundary for backend API and local persistence integrations.
+
+## SQLite Storage Docs
+- Collaborator guide: `src/features/storage/README.md`
+- Runtime smoke test docs: `tests/README.md`

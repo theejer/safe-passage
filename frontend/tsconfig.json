@@ -12,6 +12,7 @@
   "include": [
     "app",
     "src",
+    "tests",
     "expo-env.d.ts",
     ".expo/types/**/*.ts"
   ]

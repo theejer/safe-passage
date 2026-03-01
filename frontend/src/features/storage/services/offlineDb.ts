@@ -7,6 +7,10 @@ const DB_NAME = "safepassage.db";
 const SCHEMA_VERSION = "1";
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
+let initPromise: Promise<{ initialized: true; dbName: string; schemaVersion: string }> | null = null;
+let initialized = false;
+
+const INIT_TIMEOUT_MS = 30000;
 
 export type SyncQueueJob = {
   id: number;
@@ -35,9 +39,19 @@ export type LocalIncident = {
 
 async function getDb() {
   if (!dbPromise) {
+    console.log("[offlineDb] opening database", DB_NAME);
     dbPromise = openDatabaseAsync(DB_NAME);
   }
   return dbPromise;
+}
+
+function withTimeout<T>(task: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return Promise.race([
+    task,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
 }
 
 function nowIso() {
@@ -45,107 +59,125 @@ function nowIso() {
 }
 
 export async function initializeOfflineDb() {
-  const db = await getDb();
+  if (initialized) {
+    return { initialized: true as const, dbName: DB_NAME, schemaVersion: SCHEMA_VERSION };
+  }
 
-  await db.execAsync(`
-    PRAGMA foreign_keys = ON;
+  if (initPromise) {
+    return initPromise;
+  }
 
-    CREATE TABLE IF NOT EXISTS metadata (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+  initPromise = (async () => {
+    console.log("[offlineDb] initialize start");
+    const db = await withTimeout(getDb(), INIT_TIMEOUT_MS, "openDatabaseAsync");
 
-    CREATE TABLE IF NOT EXISTS trips (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      sync_status TEXT NOT NULL DEFAULT 'pending'
-    );
+    const statements = [
+      "PRAGMA foreign_keys = ON",
+      `CREATE TABLE IF NOT EXISTS metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS trips (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending'
+      )`,
+      `CREATE TABLE IF NOT EXISTS itinerary_days (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trip_id TEXT NOT NULL,
+        day_index INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        accommodation TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(trip_id, day_index)
+      )`,
+      `CREATE TABLE IF NOT EXISTS itinerary_locations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trip_id TEXT NOT NULL,
+        day_index INTEGER NOT NULL,
+        location_index INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        district TEXT,
+        block TEXT,
+        connectivity_zone TEXT,
+        assumed_location_risk TEXT,
+        UNIQUE(trip_id, day_index, location_index)
+      )`,
+      `CREATE TABLE IF NOT EXISTS risk_reports (
+        id TEXT PRIMARY KEY,
+        trip_id TEXT NOT NULL,
+        report_json TEXT NOT NULL,
+        summary TEXT,
+        created_at TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'synced'
+      )`,
+      `CREATE TABLE IF NOT EXISTS incidents (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        trip_id TEXT,
+        scenario_key TEXT NOT NULL,
+        occurred_at TEXT NOT NULL,
+        gps_lat REAL,
+        gps_lng REAL,
+        notes TEXT,
+        severity TEXT,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS incident_attachments (
+        id TEXT PRIMARY KEY,
+        incident_id TEXT NOT NULL,
+        attachment_type TEXT NOT NULL,
+        local_uri TEXT,
+        metadata_json TEXT,
+        captured_at TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS sync_queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'pending',
+        next_retry_at TEXT,
+        created_at TEXT NOT NULL
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_itinerary_day_trip ON itinerary_days(trip_id, day_index)",
+      "CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at)",
+      "CREATE INDEX IF NOT EXISTS idx_incidents_sync ON incidents(sync_status, occurred_at)",
+    ];
 
-    CREATE TABLE IF NOT EXISTS itinerary_days (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      trip_id TEXT NOT NULL,
-      day_index INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      accommodation TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      UNIQUE(trip_id, day_index)
-    );
+    for (let index = 0; index < statements.length; index += 1) {
+      await withTimeout(db.execAsync(statements[index]), INIT_TIMEOUT_MS, `schema statement ${index + 1}`);
+    }
 
-    CREATE TABLE IF NOT EXISTS itinerary_locations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      trip_id TEXT NOT NULL,
-      day_index INTEGER NOT NULL,
-      location_index INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      district TEXT,
-      block TEXT,
-      connectivity_zone TEXT,
-      assumed_location_risk TEXT,
-      UNIQUE(trip_id, day_index, location_index)
-    );
+    await withTimeout(setMetadata("schema_version", SCHEMA_VERSION), INIT_TIMEOUT_MS, "schema metadata write");
 
-    CREATE TABLE IF NOT EXISTS risk_reports (
-      id TEXT PRIMARY KEY,
-      trip_id TEXT NOT NULL,
-      report_json TEXT NOT NULL,
-      summary TEXT,
-      created_at TEXT NOT NULL,
-      sync_status TEXT NOT NULL DEFAULT 'synced'
-    );
+    initialized = true;
+    console.log("[offlineDb] initialize complete");
+    return { initialized: true as const, dbName: DB_NAME, schemaVersion: SCHEMA_VERSION };
+  })();
 
-    CREATE TABLE IF NOT EXISTS incidents (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      trip_id TEXT,
-      scenario_key TEXT NOT NULL,
-      occurred_at TEXT NOT NULL,
-      gps_lat REAL,
-      gps_lng REAL,
-      notes TEXT,
-      severity TEXT,
-      sync_status TEXT NOT NULL DEFAULT 'pending',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS incident_attachments (
-      id TEXT PRIMARY KEY,
-      incident_id TEXT NOT NULL,
-      attachment_type TEXT NOT NULL,
-      local_uri TEXT,
-      metadata_json TEXT,
-      captured_at TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS sync_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL,
-      entity_id TEXT NOT NULL,
-      operation TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'pending',
-      next_retry_at TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id);
-    CREATE INDEX IF NOT EXISTS idx_itinerary_day_trip ON itinerary_days(trip_id, day_index);
-    CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at);
-    CREATE INDEX IF NOT EXISTS idx_incidents_sync ON incidents(sync_status, occurred_at);
-  `);
-
-  await setMetadata("schema_version", SCHEMA_VERSION);
-
-  return { initialized: true, dbName: DB_NAME, schemaVersion: SCHEMA_VERSION };
+  try {
+    return await initPromise;
+  } catch (error) {
+    console.log("[offlineDb] initialize failed", error);
+    dbPromise = null;
+    throw error;
+  } finally {
+    initPromise = null;
+  }
 }
 
 export async function setMetadata(key: string, value: string) {
