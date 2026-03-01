@@ -1,18 +1,43 @@
-import { env } from "@/shared/config/env";
+import { env, getBackendUrlCandidates } from "@/shared/config/env";
 
 async function request(method: string, path: string, body?: unknown) {
-  const response = await fetch(`${env.BACKEND_URL}${path}`, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const urls = getBackendUrlCandidates();
+  let lastError: unknown = null;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`API ${method} ${path} failed: ${response.status} ${text}`);
+  for (let index = 0; index < urls.length; index += 1) {
+    const baseUrl = urls[index];
+    try {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`API ${method} ${path} failed: ${response.status} ${text}`);
+      }
+
+      return response.status === 204 ? null : response.json();
+    } catch (error) {
+      lastError = error;
+      const isLastCandidate = index === urls.length - 1;
+      if (!isLastCandidate) {
+        continue;
+      }
+    }
   }
 
-  return response.status === 204 ? null : response.json();
+  if (lastError instanceof Error) {
+    if (lastError.message.includes("Network request failed")) {
+      throw new Error(
+        `Network request failed. Checked backend URLs: ${urls.join(", ")}. Ensure backend is running and reachable from your device.`
+      );
+    }
+    throw lastError;
+  }
+
+  throw new Error(`API ${method} ${path} failed at ${env.BACKEND_URL}`);
 }
 
 export const apiClient = {
