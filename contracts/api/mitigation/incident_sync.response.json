@@ -1,0 +1,9 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JSYNC",
+  "accepted_ids": ["inc_44ca44d1-cd2d-40ed-b6f2-6a40fce7df59"],
+  "rejected_ids": [],
+  "conflict_ids": [],
+  "next_retry_at": null,
+  "sync_status": "complete"
+}

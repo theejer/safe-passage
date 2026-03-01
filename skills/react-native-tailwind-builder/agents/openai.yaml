@@ -1,4 +1,0 @@
-interface:
-  display_name: "React Native Tailwind Builder"
-  short_description: "Build React Native features with NativeWind checks."
-  default_prompt: "Use this skill to build and verify React Native features styled with NativeWind utility classes."

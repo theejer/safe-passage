@@ -1,0 +1,10 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JACK",
+  "alert_id": "alt_7ba6d5ed-7d9e-4b4e-93c8-a9f6408fa1b4",
+  "actor_type": "emergency_contact",
+  "actor_name": "Ravi Singh",
+  "status": "acknowledged",
+  "reason": "Attempting direct call and contacting homestay",
+  "acknowledged_at": "2026-04-04T12:14:00Z"
+}

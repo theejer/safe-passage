@@ -1,0 +1,11 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JEXAMPLE",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "last_synced_at": "2026-03-01T10:00:00Z",
+  "cursors": {
+    "trips": "2026-03-01T09:55:00Z",
+    "risk_reports": "2026-03-01T09:58:00Z",
+    "incidents": "2026-03-01T09:59:00Z"
+  }
+}

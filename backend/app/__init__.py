@@ -9,7 +9,7 @@ from flask import Flask
 
 from app.config import get_config
 from app.extensions import init_extensions
-
+from app.routes.reports import reports_bp
 
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application instance.
@@ -21,7 +21,7 @@ def create_app(config_name: str | None = None) -> Flask:
     """
     app = Flask(__name__)
     app.config.from_object(get_config(config_name))
-
+    app.register_blueprint(reports_bp)
     init_extensions(app)
 
     from app.routes.healthcheck import healthcheck_bp
@@ -34,7 +34,9 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(healthcheck_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(users_bp, url_prefix="/users")
+    app.register_blueprint(users_bp, url_prefix="/api/users", name="api_users")
     app.register_blueprint(trips_bp, url_prefix="/trips")
+    app.register_blueprint(trips_bp, url_prefix="/api/trips", name="api_trips")
     app.register_blueprint(itinerary_analysis_bp, url_prefix="/itinerary")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeats")
 

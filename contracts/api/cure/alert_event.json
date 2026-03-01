@@ -1,0 +1,23 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JALERT",
+  "alert_id": "alt_7ba6d5ed-7d9e-4b4e-93c8-a9f6408fa1b4",
+  "stage": "stage_2_escalation",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "trip_id": "trp_2aeb3d2e-17db-4ce7-91f2-f01f0a2b0d44",
+  "message": "Traveler offline beyond expected window near Aurangabad district.",
+  "channels": ["sms", "push", "email"],
+  "recipients": [
+    {
+      "type": "emergency_contact",
+      "name": "Ravi Singh",
+      "phone": "+919123456789"
+    }
+  ],
+  "escalation_context": {
+    "nearest_police": "Aurangabad PS",
+    "nearest_chc": "Kutumba CHC",
+    "helpline_112": "112"
+  },
+  "created_at": "2026-04-04T12:10:00Z"
+}

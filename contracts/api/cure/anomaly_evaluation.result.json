@@ -1,0 +1,13 @@
+{
+  "contract_version": "1.0.0",
+  "request_id": "req_01JANOM",
+  "user_id": "usr_9ecf58e4-95f2-4df2-90fc-23572d3dbe6a",
+  "trip_id": "trp_2aeb3d2e-17db-4ce7-91f2-f01f0a2b0d44",
+  "expected_offline_minutes": 90,
+  "actual_offline_minutes": 210,
+  "threshold_rule": "actual > expected * 1.5",
+  "location_risk": "high",
+  "connectivity_risk": "severe",
+  "triggered": true,
+  "trigger_stage": "stage_1_initial_alert"
+}

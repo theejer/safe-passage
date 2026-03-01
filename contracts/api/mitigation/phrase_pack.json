@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.0.0",
+  "locale": "hi-IN",
+  "pack_name": "Bihar Emergency Basic",
+  "phrases": [
+    {
+      "key": "lost_help",
+      "text": "Main raasta bhatak gaya hoon. Kya aap madad kar sakte hain?",
+      "transliteration": "Main raasta bhatak gaya hoon. Kya aap madad kar sakte hain?",
+      "audio_ref": null
+    },
+    {
+      "key": "medical_help",
+      "text": "Mujhe turant chikitsa madad chahiye.",
+      "transliteration": "Mujhe turant chikitsa madad chahiye.",
+      "audio_ref": null
+    }
+  ]
+}
