@@ -1,0 +1,129 @@
+# SafePassage Backend (Flask + Supabase)
+
+This folder contains the backend scaffold for SafePassage’s three pillars:
+- **PREVENTION**: itinerary parsing + risk analysis
+- **CURE**: heartbeat ingestion + offline anomaly monitoring
+- **MITIGATION**: incident-ready data flows and escalation hooks
+
+## Structure (Quick Gist)
+
+- `app/__init__.py` — Flask app factory, config load, blueprint registration
+- `app/config.py` — environment-driven settings (Supabase, model, notifications)
+- `app/extensions.py` — shared clients (Supabase) and extension init
+- `app/models/` — thin Supabase table wrappers (`users`, `trips`, `itineraries`, `risk_reports`, `heartbeats`)
+- `app/routes/` — API surface (users, trips, itinerary analysis, heartbeats, auth, healthcheck)
+- `app/services/` — business logic (itinerary parsing, risk engine, notifications, connectivity model)
+- `app/schemas/` — Pydantic request/response contracts
+- `app/tasks/monitor_offline.py` — scheduled CURE monitor flow
+- `app/utils/` — shared helpers (geo, HTTP client, logging)
+- `tests/` — API/service test placeholders
+- `wsgi.py` — WSGI entrypoint
+- `requirements.txt` — Python dependencies
+
+## Prerequisites
+
+- Python 3.11+ (Windows launcher `py -3` is supported)
+- Network access for package installs
+- Supabase project credentials (for DB operations)
+
+## Setup
+
+From repo root:
+
+```powershell
+cd backend
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+py -3 -m pip install --upgrade pip
+py -3 -m pip install -r requirements.txt
+```
+
+## Environment Variables
+
+Set these before running the API (PowerShell example):
+
+```powershell
+$env:SUPABASE_URL="https://<project>.supabase.co"
+$env:SUPABASE_KEY="<service-or-anon-key>"
+$env:APP_CONFIG="development"
+
+# Optional model providers
+$env:OPENAI_API_KEY=""
+$env:ANTHROPIC_API_KEY=""
+
+# Optional alert integrations
+$env:TWILIO_ACCOUNT_SID=""
+$env:TWILIO_AUTH_TOKEN=""
+$env:TWILIO_FROM_NUMBER=""
+```
+
+## Run the Backend
+
+### Local Flask process (simple)
+
+```powershell
+cd backend
+py -3 wsgi.py
+```
+
+Then open healthcheck:
+- `GET http://localhost:5000/health`
+
+### Flask CLI (optional)
+
+```powershell
+cd backend
+$env:FLASK_APP="wsgi.py"
+flask run --host 0.0.0.0 --port 5000
+```
+
+## Useful Commands
+
+### Syntax sanity check
+
+```powershell
+py -3 -m compileall app
+```
+
+### Run tests
+
+```powershell
+py -3 -m pytest tests -q
+```
+
+### Run one test file
+
+```powershell
+py -3 -m pytest tests/test_risk_engine.py -q
+```
+
+### Install missing test tooling (if needed)
+
+```powershell
+py -3 -m pip install pytest
+```
+
+### Freeze current environment (optional)
+
+```powershell
+py -3 -m pip freeze > requirements.lock.txt
+```
+
+## Current API Endpoints (Scaffold)
+
+- `GET /health`
+- `POST /auth/validate-key`
+- `POST /users`
+- `PATCH /users/<user_id>/emergency-contact`
+- `POST /trips`
+- `GET /trips?user_id=<id>`
+- `PUT /trips/<trip_id>/itinerary`
+- `GET /trips/<trip_id>/itinerary`
+- `POST /itinerary/analyze`
+- `POST /heartbeats`
+
+## Notes
+
+- This backend is scaffold-first: routes/services/models are intentionally minimal with comments for fast agentic iteration.
+- Some integrations are placeholders (Twilio/FCM/email dispatch logic is stubbed).
+- For production, add auth hardening, request rate limits, and encrypted handling for sensitive location/incident data.

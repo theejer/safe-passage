@@ -1,4 +1,0 @@
-interface:
-  display_name: "React Feature Builder"
-  short_description: "Implement and verify React features in CRA-style apps."
-  default_prompt: "Use this skill to implement React features with tests and verification steps."
