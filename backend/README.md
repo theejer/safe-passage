@@ -135,6 +135,10 @@ flask run --host 0.0.0.0 --port 5000
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
 
+## Focused Guides
+
+- Heartbeat backend integration and controls: `HEARTBEAT.md`
+
 ## Notes
 
 - This backend is scaffold-first: routes/services/models are intentionally minimal with comments for fast agentic iteration.

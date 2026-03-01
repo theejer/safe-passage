@@ -1,4 +1,16 @@
 import { env, getBackendUrlCandidates } from "@/shared/config/env";
+import { getItem } from "@/features/storage/services/localStore";
+
+const AUTH_BEARER_TOKEN_KEY = "auth_bearer_token";
+
+async function getRequestHeaders() {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = await getItem(AUTH_BEARER_TOKEN_KEY);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
 
 async function request(method: string, path: string, body?: unknown) {
   const urls = getBackendUrlCandidates();
@@ -9,7 +21,7 @@ async function request(method: string, path: string, body?: unknown) {
     try {
       const response = await fetch(`${baseUrl}${path}`, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: await getRequestHeaders(),
         body: body ? JSON.stringify(body) : undefined,
       });
 

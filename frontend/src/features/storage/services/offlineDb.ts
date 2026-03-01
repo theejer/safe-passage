@@ -1,9 +1,10 @@
 import { openDatabaseAsync, type SQLiteDatabase } from "expo-sqlite";
+import { Platform } from "react-native";
 import type { ScenarioKey } from "@/features/emergency/types";
 import type { RiskReport } from "@/features/risk/types";
 import type { Day, Trip } from "@/features/trips/types";
 
-const DB_NAME = "safepassage.db";
+const DB_NAME = Platform.OS === "web" ? ":memory:" : "safepassage.db";
 const SCHEMA_VERSION = "1";
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
@@ -39,7 +40,11 @@ export type LocalIncident = {
 
 async function getDb() {
   if (!dbPromise) {
-    console.log("[offlineDb] opening database", DB_NAME);
+    if (Platform.OS === "web") {
+      console.log("[offlineDb] opening web in-memory database to avoid OPFS handle collisions");
+    } else {
+      console.log("[offlineDb] opening database", DB_NAME);
+    }
     dbPromise = openDatabaseAsync(DB_NAME);
   }
   return dbPromise;
@@ -277,6 +282,32 @@ export async function listTrips(userId: string) {
     endDate: row.end_date,
     heartbeatEnabled: row.heartbeat_enabled === 1,
   })) as Trip[];
+}
+
+export async function getTripById(tripId: string) {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{
+    id: string;
+    user_id: string;
+    title: string;
+    start_date: string;
+    end_date: string;
+    heartbeat_enabled: number;
+  }>(
+    "SELECT id, user_id, title, start_date, end_date, heartbeat_enabled FROM trips WHERE id = ? LIMIT 1",
+    [tripId]
+  );
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    title: row.title,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    heartbeatEnabled: row.heartbeat_enabled === 1,
+  } as Trip;
 }
 
 export async function upsertItinerary(tripId: string, days: Day[]) {
