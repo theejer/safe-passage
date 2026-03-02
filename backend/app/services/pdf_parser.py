@@ -37,7 +37,7 @@ def extract_itinerary_from_document(file_path: str) -> dict[str, Any]:
         logger.warning(f"No text extracted from itinerary document: {file_path}")
         return {"days": [], "meta": {}}
 
-    logger.info(
+    logger.debug(
         "[ItineraryParser] Extracted text length=%s preview=%s",
         len(itinerary_text),
         itinerary_text[:800],
@@ -59,7 +59,7 @@ def extract_itinerary_from_text(itinerary_text: str) -> dict[str, Any]:
     # Step 2: Use LLM to structure text
     try:
         itinerary = _parse_with_llm(itinerary_text)
-        logger.info(f"Successfully parsed itinerary text with {len(itinerary.get('days', []))} days")
+        logger.debug(f"Successfully parsed itinerary text with {len(itinerary.get('days', []))} days")
         return itinerary
     except (APIError, ValueError) as e:
         logger.warning(f"LLM parsing failed: {e}, attempting fallback parsing")

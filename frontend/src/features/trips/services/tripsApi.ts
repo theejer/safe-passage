@@ -7,6 +7,7 @@ import {
   upsertTrip,
 } from "@/features/storage/services/offlineDb";
 import { setItem } from "@/features/storage/services/localStore";
+import { canSyncTripOnline } from "@/shared/utils/syncGuards";
 
 const ACTIVE_TRIP_ID_KEY = "active_trip_id";
 
@@ -57,6 +58,12 @@ export async function createTrip(payload: TripCreateInput) {
     heartbeatEnabled: payload.heartbeatEnabled ?? true,
   };
 
+  if (!canSyncTripOnline(payload.userId)) {
+    await upsertTrip(localTrip);
+    await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
+    return localTrip;
+  }
+
   try {
     const response = await apiClient.post("/trips", toWireTrip(payload));
     const wireTrip = response as TripWire;
@@ -79,6 +86,11 @@ export async function createTrip(payload: TripCreateInput) {
 
 export async function listTrips(userId: string) {
   await initializeOfflineDb();
+
+  if (!canSyncTripOnline(userId)) {
+    const localItems = await listLocalTrips(userId);
+    return { items: localItems };
+  }
 
   try {
     const response = (await apiClient.get(`/trips?user_id=${encodeURIComponent(userId)}`)) as {

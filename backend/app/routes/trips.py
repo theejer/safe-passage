@@ -9,6 +9,7 @@ import tempfile
 from typing import Any
 from flask import Blueprint, jsonify, request
 from pydantic import ValidationError
+from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
 from app.models.itineraries import get_itinerary, upsert_itinerary
 from app.models.trips import create_trip, list_trips_by_user
@@ -118,7 +119,15 @@ def create_trip_route():
     except ValidationError as exc:
         return jsonify({"error": "invalid trip payload", "details": exc.errors()}), 400
 
-    created = create_trip(payload)
+    try:
+        created = create_trip(payload)
+    except (DataError, IntegrityError) as exc:
+        logger.warning("Trip create rejected due to data/constraint issue: %s", exc)
+        return jsonify({"error": "invalid trip data for configured database", "details": str(exc)}), 400
+    except SQLAlchemyError as exc:
+        logger.exception("Trip create failed due to database error")
+        return jsonify({"error": "database error while creating trip", "details": str(exc)}), 500
+
     return jsonify(created), 201
 
 
@@ -194,11 +203,11 @@ def upload_pdf_route():
         
         try:
             # Extract itinerary from PDF
-            logger.info(f"Extracting itinerary from uploaded document for trip {trip_id}")
+            logger.debug(f"Extracting itinerary from uploaded document for trip {trip_id}")
             itinerary = extract_itinerary_from_document(temp_path)
             itinerary = _normalize_itinerary_payload(itinerary)
             itinerary = ItinerarySchema.model_validate(itinerary).model_dump()
-            logger.info("[ItineraryParser] Normalized upload output: %s", itinerary)
+            logger.debug("[ItineraryParser] Normalized upload output: %s", itinerary)
             
             # Optionally save to database
             saved = False
@@ -206,7 +215,7 @@ def upload_pdf_route():
                 try:
                     upsert_itinerary(trip_id, itinerary)
                     saved = True
-                    logger.info(f"Saved extracted itinerary for trip {trip_id}")
+                    logger.debug(f"Saved extracted itinerary for trip {trip_id}")
                 except Exception as save_error:
                     logger.warning(
                         "Could not persist extracted itinerary for trip %s; returning parsed data only: %s",
@@ -246,7 +255,7 @@ def parse_text_route():
         itinerary = extract_itinerary_from_text(itinerary_text)
         itinerary = _normalize_itinerary_payload(itinerary)
         itinerary = ItinerarySchema.model_validate(itinerary).model_dump()
-        logger.info("[ItineraryParser] Normalized text output: %s", itinerary)
+        logger.debug("[ItineraryParser] Normalized text output: %s", itinerary)
         saved = False
         if trip_id and itinerary.get("days"):
             try:

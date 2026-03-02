@@ -6,6 +6,7 @@ import {
   getLatestRiskReport,
   initializeOfflineDb,
 } from "@/features/storage/services/offlineDb";
+import { canSyncItineraryOnline } from "@/shared/utils/syncGuards";
 
 type RiskLocationWire = {
   name?: string;
@@ -91,10 +92,12 @@ function fromWireReport(report: RiskReportWire): RiskReport {
 export async function analyzeTripRisk(tripId: string, days: Day[]): Promise<RiskReport> {
   await initializeOfflineDb();
 
+  const onlineTrip = canSyncItineraryOnline(tripId);
+
   const response = (await apiClient.post("/itinerary/analyze", {
     contract_version: "1.0.0",
     request_id: `req_${Date.now()}`,
-    trip_id: tripId,
+    trip_id: onlineTrip ? tripId : undefined,
     itinerary: {
       days: toWireDays(days),
       meta: { source: "user-reviewed-itinerary" },
@@ -115,6 +118,10 @@ export async function analyzeTripRisk(tripId: string, days: Day[]): Promise<Risk
 // Fetches risk analysis data for PREVENTION screens.
 export async function getRiskReport(tripId: string): Promise<RiskReport | null> {
   await initializeOfflineDb();
+
+  if (!canSyncItineraryOnline(tripId)) {
+    return getLatestRiskReport(tripId);
+  }
 
   try {
     const response = (await apiClient.get(`/api/reports?trip_id=${encodeURIComponent(tripId)}`)) as {

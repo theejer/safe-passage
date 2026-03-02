@@ -88,14 +88,14 @@ def analyze_route():
         return jsonify({"error": "invalid itinerary payload", "details": exc.errors()}), 400
 
     normalized = normalize_itinerary(itinerary)
-    logger.info("[RiskAnalyze] Start request_id=%s trip_id=%s days=%s", request_id, trip_id, len(normalized.get("days", [])))
+    logger.debug("[RiskAnalyze] Start request_id=%s trip_id=%s days=%s", request_id, trip_id, len(normalized.get("days", [])))
 
     analyzer_mode = "openai"
 
     try:
         openai_result = analyze_itinerary_with_openai(normalized, request_id=request_id)
         report = openai_result.get("report", {})
-        logger.info("[RiskAnalyze] OpenAI analyzer completed request_id=%s", request_id)
+        logger.debug("[RiskAnalyze] OpenAI analyzer completed request_id=%s", request_id)
     except OpenAIRiskAnalyzerError as exc:
         logger.warning("OpenAI analyzer unavailable, using heuristic risk engine fallback: %s", exc)
         analyzer_mode = "heuristic_fallback"
@@ -116,7 +116,7 @@ def analyze_route():
         except Exception as exc:
             logger.warning("Could not persist risk report for trip %s: %s", trip_id, exc)
 
-    logger.info("[RiskAnalyze] Completed request_id=%s analyzer=%s saved=%s", request_id, analyzer_mode, bool(saved))
+    logger.debug("[RiskAnalyze] Completed request_id=%s analyzer=%s saved=%s", request_id, analyzer_mode, bool(saved))
 
     return jsonify(
         {

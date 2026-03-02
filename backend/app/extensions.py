@@ -26,7 +26,7 @@ def init_extensions(app: Flask) -> None:
     """
     global supabase_client, sqlalchemy_engine
 
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
 
     url = app.config.get("SUPABASE_URL")
     key = app.config.get("SUPABASE_KEY")
@@ -37,7 +37,7 @@ def init_extensions(app: Flask) -> None:
         except Exception as e:
             app.logger.warning(f"Supabase initialization failed: {e}. Continuing in degraded mode.")
     else:
-        app.logger.info("Supabase auth integration not configured; continuing with SQLAlchemy-backed data access.")
+        app.logger.debug("Supabase auth integration not configured; continuing with SQLAlchemy-backed data access.")
 
     sqlalchemy_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
     if sqlalchemy_uri:
