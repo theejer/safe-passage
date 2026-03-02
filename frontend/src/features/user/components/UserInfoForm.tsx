@@ -5,11 +5,15 @@ import { useUserProfile } from "@/features/user/hooks/useUserProfile";
 export function UserInfoForm() {
   // Minimal onboarding form for name + emergency contact phone.
   const router = useRouter();
-  const { profile, setProfile, saveProfile, isSaving } = useUserProfile();
+  const { profile, setProfile, saveProfile, saveError, isSaving } = useUserProfile();
 
   async function onSavePress() {
-    await saveProfile();
-    router.replace("/trips");
+    try {
+      await saveProfile({ requireRemote: true });
+      router.replace("/trips");
+    } catch {
+      return;
+    }
   }
 
   return (
@@ -49,6 +53,7 @@ export function UserInfoForm() {
         style={{ borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8 }}
       />
       <Button title={isSaving ? "Saving..." : "Save"} onPress={() => void onSavePress()} />
+      {saveError ? <Text style={{ color: "#b00020" }}>{saveError}</Text> : null}
       <Text style={{ color: "#666" }}>Profile is used for alerts and trip ownership.</Text>
     </View>
   );
