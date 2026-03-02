@@ -57,10 +57,13 @@ def test_group_boundaries_are_fixed():
 
 
 def test_offline_minutes_mapping_is_deterministic():
-    assert connectivity_predictor._offline_minutes_for_score(80.0) == 15
-    assert connectivity_predictor._offline_minutes_for_score(60.0) == 45
-    assert connectivity_predictor._offline_minutes_for_score(30.0) == 90
-    assert connectivity_predictor._offline_minutes_for_score(10.0) == 180
+    assert connectivity_predictor._offline_minutes_for_score(0.0) == 180
+    assert connectivity_predictor._offline_minutes_for_score(25.0) == 120
+    assert connectivity_predictor._offline_minutes_for_score(50.0) == 70
+    assert connectivity_predictor._offline_minutes_for_score(75.0) == 35
+    assert connectivity_predictor._offline_minutes_for_score(100.0) == 15
+    assert connectivity_predictor._offline_minutes_for_score(80.0) < connectivity_predictor._offline_minutes_for_score(76.0)
+    assert connectivity_predictor._offline_minutes_for_score(60.0) < connectivity_predictor._offline_minutes_for_score(30.0)
 
 
 def test_sparse_neighborhood_sets_fallback_metadata(monkeypatch, tmp_path):
@@ -98,4 +101,17 @@ def test_outside_bihar_returns_fallback(monkeypatch, tmp_path):
 
     assert prediction["fallback_reason"] == "outside_bihar_bbox"
     assert prediction["connectivity_group"] == "Poor"
-    assert prediction["expected_offline_minutes"] == 180
+    assert prediction["expected_offline_minutes"] == connectivity_predictor._offline_minutes_for_score(
+        prediction["connectivity_score"]
+    )
+
+
+def test_real_coordinate_prediction_works():
+    prediction = connectivity_predictor.predict_connectivity_for_latlon(26.185754, 84.881594)
+
+    assert 0.0 <= prediction["connectivity_score"] <= 100.0
+    assert prediction["connectivity_group"] in {"Poor", "Average", "Good", "Excellent"}
+    assert prediction["expected_connectivity"] == prediction["connectivity_group"]
+    assert isinstance(prediction["expected_offline_minutes"], int)
+    assert prediction["expected_offline_minutes"] >= 0
+    assert prediction["fallback_reason"] != "outside_bihar_bbox"

@@ -141,13 +141,24 @@ def _group_for_score(score: float) -> str:
 
 
 def _offline_minutes_for_score(score: float) -> int:
-    if score >= 75:
-        return 15
-    if score >= 50:
-        return 45
-    if score >= 25:
-        return 90
-    return 180
+    bounded_score = _clamp(score, 0.0, 100.0)
+
+    def _interpolate(score_value: float, x0: float, y0: float, x1: float, y1: float) -> float:
+        if x1 <= x0:
+            return y1
+        ratio = (score_value - x0) / (x1 - x0)
+        return y0 + (y1 - y0) * ratio
+
+    if bounded_score <= 25.0:
+        minutes = _interpolate(bounded_score, 0.0, 180.0, 25.0, 120.0)
+    elif bounded_score <= 50.0:
+        minutes = _interpolate(bounded_score, 25.0, 120.0, 50.0, 70.0)
+    elif bounded_score <= 75.0:
+        minutes = _interpolate(bounded_score, 50.0, 70.0, 75.0, 35.0)
+    else:
+        minutes = _interpolate(bounded_score, 75.0, 35.0, 100.0, 15.0)
+
+    return int(round(_clamp(minutes, 15.0, 180.0)))
 
 
 def _fallback_prediction(latitude: float, longitude: float, reason: str) -> ConnectivityPrediction:
