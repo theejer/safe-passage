@@ -112,6 +112,56 @@ $env:FLASK_APP="wsgi.py"
 flask run --host 0.0.0.0 --port 5000
 ```
 
+## Run with Docker (Recommended for GitHub reviewers)
+
+From repo root:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
+
+Edit `backend/.env` and set at least:
+
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `OPENAI_API_KEY` (if using AI itinerary/risk features)
+
+Then start the backend container:
+
+```powershell
+docker compose up --build backend
+```
+
+Healthcheck:
+
+- `GET http://localhost:5000/health`
+
+Run in detached mode:
+
+```powershell
+docker compose up --build -d backend
+```
+
+Stop container:
+
+```powershell
+docker compose down
+```
+
+PowerShell helper script from repo root:
+
+```powershell
+./scripts/backend-docker.ps1 -Action up
+./scripts/backend-docker.ps1 -Action logs
+./scripts/backend-docker.ps1 -Action status
+./scripts/backend-docker.ps1 -Action down
+```
+
+Notes:
+
+- `docker-compose.yml` persists local sqlite data in a named volume (`safepassage_data`).
+- Compose defaults `APP_CONFIG=production` and disables heartbeat scheduler unless enabled in env.
+
 ## Useful Commands
 
 ### Syntax sanity check
