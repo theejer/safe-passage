@@ -8,6 +8,7 @@ Handles:
 
 import json
 import os
+from datetime import date, timedelta
 from typing import Any
 
 import pdfplumber
@@ -23,7 +24,7 @@ from app.utils.logging import get_logger
 logger = get_logger(__name__)
 
 
-def extract_itinerary_from_document(file_path: str) -> dict[str, Any]:
+def extract_itinerary_from_document(file_path: str, *, parser_context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Extract itinerary from a supported document file using AI parsing.
     
     Args:
@@ -37,34 +38,100 @@ def extract_itinerary_from_document(file_path: str) -> dict[str, Any]:
         logger.warning(f"No text extracted from itinerary document: {file_path}")
         return {"days": [], "meta": {}}
 
-    logger.info(
+    logger.debug(
         "[ItineraryParser] Extracted text length=%s preview=%s",
         len(itinerary_text),
         itinerary_text[:800],
     )
 
-    return extract_itinerary_from_text(itinerary_text)
+    return extract_itinerary_from_text(itinerary_text, parser_context=parser_context)
 
 
-def extract_itinerary_from_pdf(file_path: str) -> dict[str, Any]:
+def extract_itinerary_from_pdf(file_path: str, *, parser_context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Backwards-compatible wrapper for older callers expecting PDF-only API."""
-    return extract_itinerary_from_document(file_path)
+    return extract_itinerary_from_document(file_path, parser_context=parser_context)
 
 
-def extract_itinerary_from_text(itinerary_text: str) -> dict[str, Any]:
+def extract_itinerary_from_text(itinerary_text: str, *, parser_context: dict[str, Any] | None = None) -> dict[str, Any]:
     """Extract itinerary JSON from raw itinerary text."""
     if not itinerary_text.strip():
         return {"days": [], "meta": {}}
 
+    normalized_context = _normalize_parser_context(parser_context)
+
     # Step 2: Use LLM to structure text
     try:
-        itinerary = _parse_with_llm(itinerary_text)
-        logger.info(f"Successfully parsed itinerary text with {len(itinerary.get('days', []))} days")
+        itinerary = _parse_with_llm(itinerary_text, parser_context=normalized_context)
+        itinerary = _apply_parser_context(itinerary, normalized_context)
+        logger.debug(f"Successfully parsed itinerary text with {len(itinerary.get('days', []))} days")
         return itinerary
     except (APIError, ValueError) as e:
         logger.warning(f"LLM parsing failed: {e}, attempting fallback parsing")
         # Fallback: basic text parsing if LLM unavailable
-        return _parse_with_fallback(itinerary_text)
+        fallback = _parse_with_fallback(itinerary_text)
+        return _apply_parser_context(fallback, normalized_context)
+
+
+def _as_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalize_parser_context(raw_context: dict[str, Any] | None) -> dict[str, str | None]:
+    context = raw_context if isinstance(raw_context, dict) else {}
+    destination_country = _as_text(context.get("destination_country"))
+    if destination_country:
+        destination_country = destination_country.upper()
+        if len(destination_country) != 2 or not destination_country.isalpha():
+            destination_country = None
+
+    return {
+        "trip_name": _as_text(context.get("trip_name")),
+        "start_date": _as_text(context.get("start_date")),
+        "end_date": _as_text(context.get("end_date")),
+        "destination_country": destination_country,
+    }
+
+
+def _parse_iso_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value)
+    except Exception:
+        return None
+
+
+def _apply_parser_context(itinerary: dict[str, Any], parser_context: dict[str, str | None]) -> dict[str, Any]:
+    output = itinerary if isinstance(itinerary, dict) else {"days": [], "meta": {}}
+    days = output.get("days") if isinstance(output.get("days"), list) else []
+    start = _parse_iso_date(parser_context.get("start_date"))
+    end = _parse_iso_date(parser_context.get("end_date"))
+
+    if start:
+        for index, day_entry in enumerate(days):
+            if not isinstance(day_entry, dict):
+                continue
+            computed = start + timedelta(days=index)
+            if end and computed > end:
+                computed = end
+            day_entry["date"] = computed.isoformat()
+
+    meta = output.get("meta") if isinstance(output.get("meta"), dict) else {}
+    if parser_context.get("trip_name"):
+        meta["trip_name"] = parser_context["trip_name"]
+    if parser_context.get("start_date"):
+        meta["start_date"] = parser_context["start_date"]
+    if parser_context.get("end_date"):
+        meta["end_date"] = parser_context["end_date"]
+    if parser_context.get("destination_country"):
+        meta["destination_country"] = parser_context["destination_country"]
+
+    output["meta"] = meta
+    output["days"] = days
+    return output
 
 
 def _extract_document_text(file_path: str) -> str:
@@ -132,7 +199,7 @@ def _extract_plain_text(file_path: str) -> str:
     return ""
 
 
-def _parse_with_llm(pdf_text: str) -> dict[str, Any]:
+def _parse_with_llm(pdf_text: str, *, parser_context: dict[str, str | None] | None = None) -> dict[str, Any]:
     """Use OpenAI GPT to structure itinerary text into JSON format.
     
     Expected output format:
@@ -155,6 +222,14 @@ def _parse_with_llm(pdf_text: str) -> dict[str, Any]:
 
     client = OpenAI(api_key=api_key)
 
+    normalized_context = _normalize_parser_context(parser_context)
+    context_block = ""
+    if any(normalized_context.values()):
+        context_block = (
+            "\nForm-provided trip context (authoritative when present):\n"
+            f"{json.dumps(normalized_context, indent=2)}\n"
+        )
+
     prompt = f"""Extract trip itinerary details from the following text and return a JSON object.
 
 Only return valid JSON with this structure:
@@ -172,13 +247,15 @@ Only return valid JSON with this structure:
 }}
 
 Rules:
-- If dates are not explicitly given, infer from day numbers (Day 1, Day 2, etc.)
+- If form-provided trip context has start_date/end_date, do NOT invent random dates; align day dates from start_date sequentially.
+- If no dates are available in text or context, set date to null/TBD style values instead of inventing specific calendar dates.
 - Locations must include at least the place name
 - Extract all locations mentioned in the itinerary
 - For Bihar locations: prioritize known districts like Patna, Nalanda, Gaya, Bhojpur, etc.
 - If no accommodation info, leave that field empty or null
 - Return ONLY valid JSON, no markdown code blocks
 
+{context_block}
 Text to parse:
 {pdf_text[:3000]}  # Limit to first 3000 chars to avoid token overflow
 """

@@ -6,6 +6,7 @@ import {
   initializeOfflineDb,
   upsertItinerary as upsertLocalItinerary,
 } from "@/features/storage/services/offlineDb";
+import { canSyncItineraryOnline } from "@/shared/utils/syncGuards";
 
 type DayWire = {
   date: string;
@@ -74,6 +75,11 @@ export async function upsertItinerary(tripId: string, days: Day[]) {
   await upsertLocalItinerary(tripId, days);
 
   const wireDays = toWireDays(days);
+
+  if (!canSyncItineraryOnline(tripId)) {
+    return { trip_id: tripId, days: wireDays, meta: { saved: false, local_only: true } };
+  }
+
   try {
     return await apiClient.put(`/trips/${tripId}/itinerary`, { days: wireDays, meta: {} });
   } catch {
@@ -89,6 +95,10 @@ export async function upsertItinerary(tripId: string, days: Day[]) {
 
 export async function getLatestItinerary(tripId: string) {
   await initializeOfflineDb();
+
+  if (!canSyncItineraryOnline(tripId)) {
+    return getItinerary(tripId);
+  }
 
   try {
     const response = (await apiClient.get(`/trips/${tripId}/itinerary`)) as { days?: DayWire[] };

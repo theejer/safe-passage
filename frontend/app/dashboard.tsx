@@ -1,6 +1,7 @@
 import { Link, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useTrips } from "@/features/trips/hooks/useTrips";
 import { getItem } from "@/features/storage/services/localStore";
 
@@ -9,7 +10,7 @@ const ACTIVE_USER_ID_KEY = "active_user_id";
 export default function DashboardScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState("demo-user");
-  const { items, loading } = useTrips(userId);
+  const { items, loading, reload } = useTrips(userId);
 
   useEffect(() => {
     async function loadUserId() {
@@ -21,6 +22,30 @@ export default function DashboardScreen() {
 
     void loadUserId();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let canceled = false;
+
+      async function refreshOnFocus() {
+        const saved = await getItem(ACTIVE_USER_ID_KEY);
+        if (canceled) return;
+
+        if (saved && saved !== userId) {
+          setUserId(saved);
+          return;
+        }
+
+        await reload();
+      }
+
+      void refreshOnFocus();
+
+      return () => {
+        canceled = true;
+      };
+    }, [reload, userId])
+  );
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>

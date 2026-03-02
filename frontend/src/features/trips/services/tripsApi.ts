@@ -7,6 +7,7 @@ import {
   upsertTrip,
 } from "@/features/storage/services/offlineDb";
 import { setItem } from "@/features/storage/services/localStore";
+import { canSyncTripOnline } from "@/shared/utils/syncGuards";
 
 const ACTIVE_TRIP_ID_KEY = "active_trip_id";
 
@@ -57,6 +58,12 @@ export async function createTrip(payload: TripCreateInput) {
     heartbeatEnabled: payload.heartbeatEnabled ?? true,
   };
 
+  if (!canSyncTripOnline(payload.userId)) {
+    await upsertTrip(localTrip);
+    await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
+    return localTrip;
+  }
+
   try {
     const response = await apiClient.post("/trips", toWireTrip(payload));
     const wireTrip = response as TripWire;
@@ -79,6 +86,11 @@ export async function createTrip(payload: TripCreateInput) {
 
 export async function listTrips(userId: string) {
   await initializeOfflineDb();
+  const localItems = await listLocalTrips(userId);
+
+  if (!canSyncTripOnline(userId)) {
+    return { items: localItems };
+  }
 
   try {
     const response = (await apiClient.get(`/trips?user_id=${encodeURIComponent(userId)}`)) as {
@@ -88,9 +100,18 @@ export async function listTrips(userId: string) {
     for (const trip of normalizedItems) {
       await upsertTrip(trip);
     }
-    return { items: normalizedItems };
+
+    const mergedById = new Map<string, Trip>();
+    for (const localTrip of localItems) {
+      mergedById.set(localTrip.id, localTrip);
+    }
+    for (const remoteTrip of normalizedItems) {
+      mergedById.set(remoteTrip.id, remoteTrip);
+    }
+
+    const merged = [...mergedById.values()].sort((a, b) => b.startDate.localeCompare(a.startDate));
+    return { items: merged };
   } catch {
-    const localItems = await listLocalTrips(userId);
     return { items: localItems };
   }
 }

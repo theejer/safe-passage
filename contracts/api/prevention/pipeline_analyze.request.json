@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "required": ["itinerary"],
+  "properties": {
+    "itinerary": { "type": "string", "minLength": 1 },
+    "trip_id": { "type": "string" },
+    "trip_name": { "type": "string" },
+    "start_date": { "type": "string" },
+    "end_date": { "type": "string" },
+    "destination_country": { "type": "string", "pattern": "^[A-Za-z]{2}$" },
+    "parser_model": { "type": "string" },
+    "analyzer_model": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "client_request_id": { "type": "string" },
+        "source": { "type": "string" },
+        "trip_name": { "type": "string" },
+        "start_date": { "type": "string" },
+        "end_date": { "type": "string" },
+        "destination_country": { "type": "string", "pattern": "^[A-Za-z]{2}$" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

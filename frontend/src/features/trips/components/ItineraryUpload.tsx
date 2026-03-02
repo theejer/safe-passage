@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadItineraryPDF } from "@/features/trips/services/itineraryApi";
+import { getTripById } from "@/features/storage/services/offlineDb";
 import { Day } from "../types";
 
 type ItineraryUploadProps = {
@@ -13,6 +14,28 @@ type ItineraryUploadProps = {
 export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: ItineraryUploadProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tripMeta, setTripMeta] = useState<{ title?: string; startDate?: string; endDate?: string } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      try {
+        const trip = await getTripById(tripId);
+        if (!mounted || !trip) return;
+        setTripMeta({
+          title: trip.title,
+          startDate: trip.startDate,
+          endDate: trip.endDate,
+        });
+      } catch {
+        if (mounted) setTripMeta(null);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [tripId]);
 
   async function pickPDF() {
     try {
@@ -41,6 +64,9 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
       // Create FormData and upload
       const formData = new FormData();
       formData.append("trip_id", tripId);
+      if (tripMeta?.title) formData.append("trip_name", tripMeta.title);
+      if (tripMeta?.startDate) formData.append("start_date", tripMeta.startDate);
+      if (tripMeta?.endDate) formData.append("end_date", tripMeta.endDate);
 
       if (Platform.OS === "web") {
         const webFile = (file as any).file as File | undefined;
