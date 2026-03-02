@@ -4,6 +4,7 @@ import {
   enqueueSyncJob,
   getItinerary,
   initializeOfflineDb,
+  type SyncQueueJob,
   upsertItinerary as upsertLocalItinerary,
 } from "@/features/storage/services/offlineDb";
 import { canSyncItineraryOnline } from "@/shared/utils/syncGuards";
@@ -126,4 +127,19 @@ export async function uploadItineraryPDF(formData: FormData) {
 
   const result = (await response.json()) as { days?: DayWireFlexible[] };
   return fromWireDays(result.days ?? []);
+}
+
+export async function replayItinerarySyncJob(job: SyncQueueJob) {
+  if (job.entity_type !== "itinerary") {
+    throw new Error(`unsupported sync job entity type: ${job.entity_type}`);
+  }
+
+  const payload = JSON.parse(job.payload_json) as { trip_id?: string; days?: DayWire[]; meta?: Record<string, unknown> };
+  const tripId = String(payload.trip_id ?? job.entity_id);
+  const response = (await apiClient.put(`/trips/${tripId}/itinerary`, {
+    days: payload.days ?? [],
+    meta: payload.meta ?? {},
+  })) as { days?: DayWire[] };
+
+  await upsertLocalItinerary(tripId, fromWireDays(response.days ?? payload.days ?? []));
 }

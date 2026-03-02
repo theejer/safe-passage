@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { UserProfile } from "@/features/user/types";
 import { createUser, updateUserEmergencyContact } from "@/features/user/services/userApi";
 import { setItem } from "@/features/storage/services/localStore";
+import { generateUuidV4 } from "@/shared/utils/ids";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 const ACTIVE_USER_PROFILE_KEY = "active_user_profile";
@@ -30,7 +31,7 @@ export function useUserProfile() {
 
         const fallbackUser: UserProfile = {
           ...profile,
-          id: profile.id ?? `local_user_${Date.now()}`,
+          id: profile.id ?? generateUuidV4(),
           fullName: normalizedFullName,
           phone: normalizedPhone,
         };
@@ -62,7 +63,7 @@ export function useUserProfile() {
           setError("Could not save to server. Please ensure backend is running and try again.");
           throw error;
         }
-        resolvedUser = { ...profile, id: profile.id ?? `local_user_${Date.now()}` };
+        resolvedUser = { ...profile, id: profile.id ?? generateUuidV4() };
       }
 
       if (resolvedUser.id) {

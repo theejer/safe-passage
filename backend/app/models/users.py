@@ -58,7 +58,8 @@ def _attach_primary_emergency_contact(user_row: dict) -> dict:
 
 def create_user(payload: dict) -> dict:
     """Insert user record and return created row metadata."""
-    user_id = str(uuid4())
+    candidate_id = str(payload.get("id") or "").strip()
+    user_id = candidate_id if _is_uuid(candidate_id) else str(uuid4())
 
     insert_user_query = text(
         """

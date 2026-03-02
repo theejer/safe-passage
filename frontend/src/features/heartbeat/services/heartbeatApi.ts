@@ -1,6 +1,11 @@
 import { apiClient } from "@/lib/apiClient";
 import type { NetInfoStateType } from "@react-native-community/netinfo";
-import { enqueueSyncJob, type SyncQueueJob } from "@/features/storage/services/offlineDb";
+import {
+  enqueueSyncJob,
+  markHeartbeatJournalSynced,
+  upsertHeartbeatJournal,
+  type SyncQueueJob,
+} from "@/features/storage/services/offlineDb";
 
 export type HeartbeatSource = "foreground" | "background_fetch" | "manual_debug";
 
@@ -31,11 +36,44 @@ function isHeartbeatAuthFailure(error: unknown) {
 }
 
 export async function sendHeartbeat(payload: HeartbeatPayload) {
-  return apiClient.post("/heartbeat", payload);
+  const heartbeatId = `${payload.trip_id}_${payload.timestamp}`;
+  await upsertHeartbeatJournal({
+    id: heartbeatId,
+    user_id: payload.user_id,
+    trip_id: payload.trip_id,
+    timestamp: payload.timestamp,
+    gps_lat: payload.gps?.lat,
+    gps_lng: payload.gps?.lng,
+    accuracy_meters: payload.gps?.accuracy_meters,
+    battery_percent: payload.battery_percent,
+    network_status: payload.network_status,
+    offline_minutes: payload.offline_minutes,
+    source: payload.source,
+    sync_status: "pending",
+  });
+
+  const response = await apiClient.post("/heartbeat", payload);
+  await markHeartbeatJournalSynced(heartbeatId);
+  return response;
 }
 
 export async function queueHeartbeat(payload: HeartbeatPayload) {
   const entityId = `${payload.trip_id}_${payload.timestamp}`;
+  await upsertHeartbeatJournal({
+    id: entityId,
+    user_id: payload.user_id,
+    trip_id: payload.trip_id,
+    timestamp: payload.timestamp,
+    gps_lat: payload.gps?.lat,
+    gps_lng: payload.gps?.lng,
+    accuracy_meters: payload.gps?.accuracy_meters,
+    battery_percent: payload.battery_percent,
+    network_status: payload.network_status,
+    offline_minutes: payload.offline_minutes,
+    source: payload.source,
+    sync_status: "pending",
+  });
+
   await enqueueSyncJob({
     entityType: "heartbeat",
     entityId,
@@ -65,6 +103,7 @@ export async function replayHeartbeatSyncJob(job: SyncQueueJob) {
 
   const payload = JSON.parse(job.payload_json) as HeartbeatPayload;
   await sendHeartbeat(payload);
+  await markHeartbeatJournalSynced(job.entity_id);
 }
 
 export function isHeartbeatPermanentFailure(error: unknown) {

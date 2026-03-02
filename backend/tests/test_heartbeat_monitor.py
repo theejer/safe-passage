@@ -138,6 +138,64 @@ def test_heartbeat_route_ingest_normalizes_payload_and_returns_204(monkeypatch):
     assert captured_rows[0]["accuracy_meters"] == 20
 
 
+def test_heartbeat_route_rejects_missing_token_when_demo_fallback_disabled(monkeypatch):
+    """Route rejects missing bearer token when demo fallback is disabled."""
+    app = create_app("development")
+    app.config["HEARTBEAT_DEMO_AUTH_FALLBACK"] = False
+    client = app.test_client()
+
+    monkeypatch.setattr("app.routes.heartbeats.extract_bearer_token", lambda _req: (_ for _ in ()).throw(ValueError("missing bearer token")))
+
+    response = client.post(
+        "/heartbeat",
+        json={
+            "user_id": "usr_1",
+            "trip_id": "trp_1",
+            "timestamp": "2026-03-02T10:05:00Z",
+            "network_status": "offline",
+            "source": "background_fetch",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_heartbeat_route_allows_demo_fallback_without_token(monkeypatch):
+    """Route accepts heartbeat in development when demo auth fallback is enabled."""
+    app = create_app("development")
+    app.config["HEARTBEAT_DEMO_AUTH_FALLBACK"] = True
+    client = app.test_client()
+
+    captured_rows: list[dict] = []
+    processed_rows: list[dict] = []
+
+    monkeypatch.setattr("app.routes.heartbeats.extract_bearer_token", lambda _req: (_ for _ in ()).throw(ValueError("missing bearer token")))
+    monkeypatch.setattr(
+        "app.routes.heartbeats.get_trip_by_id",
+        lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr("app.routes.heartbeats.insert_heartbeat", lambda row: captured_rows.append(row) or row)
+    monkeypatch.setattr(
+        "app.routes.heartbeats.process_heartbeat_ingest",
+        lambda row: processed_rows.append(row) or {"ok": True},
+    )
+
+    response = client.post(
+        "/heartbeat",
+        json={
+            "user_id": "usr_1",
+            "trip_id": "trp_1",
+            "timestamp": "2026-03-02T10:05:00Z",
+            "network_status": "offline",
+            "source": "background_fetch",
+        },
+    )
+
+    assert response.status_code == 204
+    assert len(captured_rows) == 1
+    assert len(processed_rows) == 1
+
+
 def test_watchdog_timer_and_emergency_alert_for_enabled_trip(monkeypatch):
     """Watchdog computes offline timer for heartbeat-enabled trip and triggers stage alert."""
     now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)

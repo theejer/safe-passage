@@ -24,15 +24,26 @@ heartbeats_bp = Blueprint("heartbeats", __name__)
 def heartbeat_ingest_route():
     """Persist heartbeat ping used by offline anomaly monitor task."""
     try:
-        token = extract_bearer_token(request)
-        auth_user_id = verify_supabase_user_id(token)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 401
-
-    try:
         payload = HeartbeatIngestSchema.model_validate(request.get_json(force=True)).model_dump()
     except ValidationError as exc:
         return jsonify({"error": "invalid heartbeat payload", "details": exc.errors()}), 400
+
+    auth_user_id: str | None = None
+    try:
+        token = extract_bearer_token(request)
+        auth_user_id = verify_supabase_user_id(token)
+    except ValueError as exc:
+        fallback_enabled = bool(current_app.config.get("HEARTBEAT_DEMO_AUTH_FALLBACK", False))
+        is_non_production = str(current_app.config.get("FLASK_ENV", "development")).lower() != "production"
+        if not (fallback_enabled and is_non_production):
+            return jsonify({"error": str(exc)}), 401
+        auth_user_id = str(payload.get("user_id") or "").strip() or None
+        if not auth_user_id:
+            return jsonify({"error": "user_id is required for demo auth fallback"}), 400
+        current_app.logger.warning(
+            "Heartbeat ingest accepted via demo auth fallback for user_id=%s",
+            auth_user_id,
+        )
 
     if payload["user_id"] != auth_user_id:
         return jsonify({"error": "user_id does not match token subject"}), 403

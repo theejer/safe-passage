@@ -5,9 +5,11 @@ import {
   initializeOfflineDb,
   listTrips as listLocalTrips,
   upsertTrip,
+  type SyncQueueJob,
 } from "@/features/storage/services/offlineDb";
 import { setItem } from "@/features/storage/services/localStore";
 import { canSyncTripOnline } from "@/shared/utils/syncGuards";
+import { generateUuidV4 } from "@/shared/utils/ids";
 
 const ACTIVE_TRIP_ID_KEY = "active_trip_id";
 
@@ -35,22 +37,22 @@ function fromWireTrip(value: TripWire): Trip {
   };
 }
 
-function toWireTrip(payload: TripCreateInput) {
-  return {
+// CRUD-ish API wrappers for trip metadata.
+export async function createTrip(payload: TripCreateInput) {
+  await initializeOfflineDb();
+
+  const tripId = generateUuidV4();
+  const wirePayload = {
+    id: tripId,
     user_id: payload.userId,
     title: payload.title,
     start_date: payload.startDate,
     end_date: payload.endDate,
     heartbeat_enabled: payload.heartbeatEnabled ?? true,
   };
-}
-
-// CRUD-ish API wrappers for trip metadata.
-export async function createTrip(payload: TripCreateInput) {
-  await initializeOfflineDb();
 
   const localTrip: Trip = {
-    id: `local_${Date.now()}`,
+    id: tripId,
     userId: payload.userId,
     title: payload.title,
     startDate: payload.startDate,
@@ -60,12 +62,18 @@ export async function createTrip(payload: TripCreateInput) {
 
   if (!canSyncTripOnline(payload.userId)) {
     await upsertTrip(localTrip);
+    await enqueueSyncJob({
+      entityType: "trip",
+      entityId: localTrip.id,
+      operation: "upsert",
+      payload: wirePayload,
+    });
     await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
     return localTrip;
   }
 
   try {
-    const response = await apiClient.post("/trips", toWireTrip(payload));
+    const response = await apiClient.post("/trips", wirePayload);
     const wireTrip = response as TripWire;
     const normalized = fromWireTrip(wireTrip);
     await upsertTrip(normalized);
@@ -78,7 +86,7 @@ export async function createTrip(payload: TripCreateInput) {
       entityType: "trip",
       entityId: localTrip.id,
       operation: "upsert",
-      payload: toWireTrip(payload),
+      payload: wirePayload,
     });
     return localTrip;
   }
@@ -119,4 +127,14 @@ export async function listTrips(userId: string) {
 export function getTrip(tripId: string) {
   // Placeholder; backend currently provides list and itinerary endpoints.
   return apiClient.get(`/trips/${tripId}/itinerary`);
+}
+
+export async function replayTripSyncJob(job: SyncQueueJob) {
+  if (job.entity_type !== "trip") {
+    throw new Error(`unsupported sync job entity type: ${job.entity_type}`);
+  }
+
+  const payload = JSON.parse(job.payload_json) as Record<string, unknown>;
+  const response = (await apiClient.post("/trips", payload)) as TripWire;
+  await upsertTrip(fromWireTrip(response));
 }

@@ -60,6 +60,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.routes.trips import trips_bp
     from app.routes.itinerary_analysis import itinerary_analysis_bp
     from app.routes.heartbeats import heartbeats_bp
+    from app.routes.incidents import incidents_bp
     from app.routes.auth import auth_bp
 
     app.register_blueprint(healthcheck_bp)
@@ -71,6 +72,7 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(itinerary_analysis_bp, url_prefix="/itinerary")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeat", name="heartbeat_alias")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeats")
+    app.register_blueprint(incidents_bp, url_prefix="/incidents")
 
     if app.config.get("TELEGRAM_BOT_ENABLED", False):
         start_telegram_bot_poller(app)

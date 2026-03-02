@@ -87,6 +87,9 @@ $env:TELEGRAM_POLL_INTERVAL_SECONDS="2"
 $env:ENABLE_HEARTBEAT_SCHEDULER="0"
 $env:HEARTBEAT_WATCHDOG_INTERVAL_MINUTES="5"
 $env:HEARTBEAT_WATCHDOG_KEY=""
+
+# Demo-only heartbeat auth fallback (non-production only)
+$env:HEARTBEAT_DEMO_AUTH_FALLBACK="0"
 ```
 
 ## Run the Backend
@@ -203,9 +206,10 @@ Notes:
 - `GET /trips/<trip_id>/itinerary`
 - `POST /itinerary/analyze`
 - `POST /itinerary/analyze-pipeline`
-- `POST /heartbeat` (JWT required, returns 204)
+- `POST /heartbeat` (JWT required; in non-production, optional demo fallback when `HEARTBEAT_DEMO_AUTH_FALLBACK=1`)
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
+- `POST /incidents/sync`
 
 ## Focused Guides
 
@@ -216,4 +220,5 @@ Notes:
 - This backend is scaffold-first: routes/services/models are intentionally minimal with comments for fast agentic iteration.
 - Telegram emergency alerting is supported via bot polling (`/start` + phone number activation).
 - Some integrations remain placeholders (SMS/FCM/email dispatch logic is stubbed).
+- Persistence guardrail: direct Supabase SDK table writes are blocked by tests; DB writes should flow through SQLAlchemy-backed model helpers.
 - For production, add auth hardening, request rate limits, and encrypted handling for sensitive location/incident data.

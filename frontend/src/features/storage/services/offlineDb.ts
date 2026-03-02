@@ -5,7 +5,7 @@ import type { RiskReport } from "@/features/risk/types";
 import type { Day, Trip } from "@/features/trips/types";
 
 const DB_NAME = Platform.OS === "web" ? ":memory:" : "safepassage.db";
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 
 let dbPromise: Promise<SQLiteDatabase> | null = null;
 let initPromise: Promise<{ initialized: true; dbName: string; schemaVersion: string }> | null = null;
@@ -38,6 +38,47 @@ export type LocalIncident = {
   sync_status?: "pending" | "synced" | "failed";
 };
 
+export type LocalUserProfile = {
+  id: string;
+  full_name: string;
+  phone: string;
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+  sync_status?: "pending" | "synced" | "failed";
+};
+
+export type LocalEmergencyContact = {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  telegram_chat_id?: string | null;
+  telegram_bot_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+  sync_status?: "pending" | "synced" | "failed";
+};
+
+export type LocalHeartbeatJournal = {
+  id: string;
+  user_id: string;
+  trip_id: string;
+  timestamp: string;
+  gps_lat?: number;
+  gps_lng?: number;
+  accuracy_meters?: number;
+  battery_percent?: number;
+  network_status: "online" | "offline" | "unknown";
+  offline_minutes?: number;
+  source: string;
+  sync_status?: "pending" | "synced" | "failed";
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+};
+
 async function getDb() {
   if (!dbPromise) {
     if (Platform.OS === "web") {
@@ -66,6 +107,25 @@ function nowIso() {
 async function hasColumn(db: SQLiteDatabase, tableName: string, columnName: string): Promise<boolean> {
   const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${tableName})`);
   return rows.some((row) => row.name === columnName);
+}
+
+async function ensureColumn(
+  db: SQLiteDatabase,
+  tableName: string,
+  columnName: string,
+  alterSql: string,
+  migrationLabel: string
+) {
+  const exists = await withTimeout(
+    hasColumn(db, tableName, columnName),
+    INIT_TIMEOUT_MS,
+    `${tableName}.${columnName} introspection`
+  );
+
+  if (!exists) {
+    await withTimeout(db.execAsync(alterSql), INIT_TIMEOUT_MS, migrationLabel);
+    console.log(`[offlineDb] migrated ${tableName}.${columnName}`);
+  }
 }
 
 export async function initializeOfflineDb() {
@@ -97,6 +157,28 @@ export async function initializeOfflineDb() {
         heartbeat_enabled INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0,
+        sync_status TEXT NOT NULL DEFAULT 'pending'
+      )`,
+      `CREATE TABLE IF NOT EXISTS user_profiles (
+        id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0,
+        sync_status TEXT NOT NULL DEFAULT 'pending'
+      )`,
+      `CREATE TABLE IF NOT EXISTS emergency_contacts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        telegram_chat_id TEXT,
+        telegram_bot_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0,
         sync_status TEXT NOT NULL DEFAULT 'pending'
       )`,
       `CREATE TABLE IF NOT EXISTS itinerary_days (
@@ -127,7 +209,26 @@ export async function initializeOfflineDb() {
         report_json TEXT NOT NULL,
         summary TEXT,
         created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0,
         sync_status TEXT NOT NULL DEFAULT 'synced'
+      )`,
+      `CREATE TABLE IF NOT EXISTS heartbeat_journal (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        trip_id TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        gps_lat REAL,
+        gps_lng REAL,
+        accuracy_meters REAL,
+        battery_percent INTEGER,
+        network_status TEXT NOT NULL,
+        offline_minutes INTEGER,
+        source TEXT NOT NULL,
+        sync_status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS incidents (
         id TEXT PRIMARY KEY,
@@ -141,7 +242,8 @@ export async function initializeOfflineDb() {
         severity TEXT,
         sync_status TEXT NOT NULL DEFAULT 'pending',
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        source_version INTEGER NOT NULL DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS incident_attachments (
         id TEXT PRIMARY KEY,
@@ -164,7 +266,10 @@ export async function initializeOfflineDb() {
         created_at TEXT NOT NULL
       )`,
       "CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_user_profiles_sync ON user_profiles(sync_status, updated_at)",
+      "CREATE INDEX IF NOT EXISTS idx_emergency_contacts_user ON emergency_contacts(user_id, updated_at)",
       "CREATE INDEX IF NOT EXISTS idx_itinerary_day_trip ON itinerary_days(trip_id, day_index)",
+      "CREATE INDEX IF NOT EXISTS idx_heartbeat_journal_trip_time ON heartbeat_journal(trip_id, timestamp DESC)",
       "CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, created_at)",
       "CREATE INDEX IF NOT EXISTS idx_incidents_sync ON incidents(sync_status, occurred_at)",
     ];
@@ -173,20 +278,41 @@ export async function initializeOfflineDb() {
       await withTimeout(db.execAsync(statements[index]), INIT_TIMEOUT_MS, `schema statement ${index + 1}`);
     }
 
-    const hasHeartbeatEnabledColumn = await withTimeout(
-      hasColumn(db, "trips", "heartbeat_enabled"),
-      INIT_TIMEOUT_MS,
-      "trips heartbeat_enabled introspection"
+    await ensureColumn(
+      db,
+      "trips",
+      "heartbeat_enabled",
+      "ALTER TABLE trips ADD COLUMN heartbeat_enabled INTEGER NOT NULL DEFAULT 1",
+      "trips heartbeat_enabled migration"
     );
-
-    if (!hasHeartbeatEnabledColumn) {
-      await withTimeout(
-        db.execAsync("ALTER TABLE trips ADD COLUMN heartbeat_enabled INTEGER NOT NULL DEFAULT 1"),
-        INIT_TIMEOUT_MS,
-        "trips heartbeat_enabled migration"
-      );
-      console.log("[offlineDb] migrated trips.heartbeat_enabled column");
-    }
+    await ensureColumn(
+      db,
+      "trips",
+      "source_version",
+      "ALTER TABLE trips ADD COLUMN source_version INTEGER NOT NULL DEFAULT 0",
+      "trips source_version migration"
+    );
+    await ensureColumn(
+      db,
+      "risk_reports",
+      "updated_at",
+      "ALTER TABLE risk_reports ADD COLUMN updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "risk_reports updated_at migration"
+    );
+    await ensureColumn(
+      db,
+      "risk_reports",
+      "source_version",
+      "ALTER TABLE risk_reports ADD COLUMN source_version INTEGER NOT NULL DEFAULT 0",
+      "risk_reports source_version migration"
+    );
+    await ensureColumn(
+      db,
+      "incidents",
+      "source_version",
+      "ALTER TABLE incidents ADD COLUMN source_version INTEGER NOT NULL DEFAULT 0",
+      "incidents source_version migration"
+    );
 
     await withTimeout(setMetadata("schema_version", SCHEMA_VERSION), INIT_TIMEOUT_MS, "schema metadata write");
 
@@ -236,8 +362,8 @@ export async function upsertTrip(trip: Trip) {
   const createdAt = nowIso();
   await db.runAsync(
     `
-      INSERT INTO trips (id, user_id, title, start_date, end_date, heartbeat_enabled, created_at, updated_at, sync_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+      INSERT INTO trips (id, user_id, title, start_date, end_date, heartbeat_enabled, created_at, updated_at, source_version, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending')
       ON CONFLICT(id) DO UPDATE SET
         user_id = excluded.user_id,
         title = excluded.title,
@@ -245,6 +371,7 @@ export async function upsertTrip(trip: Trip) {
         end_date = excluded.end_date,
         heartbeat_enabled = excluded.heartbeat_enabled,
         updated_at = excluded.updated_at,
+        source_version = excluded.source_version,
         sync_status = 'pending'
     `,
     [
@@ -402,17 +529,18 @@ export async function getItinerary(tripId: string) {
 export async function cacheRiskReport(tripId: string, report: RiskReport) {
   const db = await getDb();
   const id = `risk_${tripId}`;
-  const createdAt = nowIso();
+  const timestamp = nowIso();
   await db.runAsync(
     `
-      INSERT INTO risk_reports (id, trip_id, report_json, summary, created_at, sync_status)
-      VALUES (?, ?, ?, ?, ?, 'synced')
+      INSERT INTO risk_reports (id, trip_id, report_json, summary, created_at, updated_at, source_version, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?, 0, 'synced')
       ON CONFLICT(id) DO UPDATE SET
         report_json = excluded.report_json,
         summary = excluded.summary,
-        created_at = excluded.created_at
+        updated_at = excluded.updated_at,
+        source_version = excluded.source_version
     `,
-    [id, tripId, JSON.stringify(report), report.summary ?? null, createdAt]
+    [id, tripId, JSON.stringify(report), report.summary ?? null, timestamp, timestamp]
   );
 }
 
@@ -437,8 +565,8 @@ export async function upsertIncident(incident: LocalIncident) {
   await db.runAsync(
     `
       INSERT INTO incidents
-        (id, user_id, trip_id, scenario_key, occurred_at, gps_lat, gps_lng, notes, severity, sync_status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, user_id, trip_id, scenario_key, occurred_at, gps_lat, gps_lng, notes, severity, sync_status, created_at, updated_at, source_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
       ON CONFLICT(id) DO UPDATE SET
         user_id = excluded.user_id,
         trip_id = excluded.trip_id,
@@ -449,7 +577,8 @@ export async function upsertIncident(incident: LocalIncident) {
         notes = excluded.notes,
         severity = excluded.severity,
         sync_status = excluded.sync_status,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        source_version = excluded.source_version
     `,
     [
       incident.id,
@@ -483,6 +612,186 @@ export async function listPendingIncidents() {
 export async function markIncidentSynced(incidentId: string) {
   const db = await getDb();
   await db.runAsync("UPDATE incidents SET sync_status = 'synced', updated_at = ? WHERE id = ?", [nowIso(), incidentId]);
+}
+
+export async function upsertUserProfile(profile: LocalUserProfile) {
+  const db = await getDb();
+  const timestamp = nowIso();
+  await db.runAsync(
+    `
+      INSERT INTO user_profiles (id, full_name, phone, created_at, updated_at, source_version, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        full_name = excluded.full_name,
+        phone = excluded.phone,
+        updated_at = excluded.updated_at,
+        source_version = excluded.source_version,
+        sync_status = excluded.sync_status
+    `,
+    [
+      profile.id,
+      profile.full_name,
+      profile.phone,
+      profile.created_at ?? timestamp,
+      profile.updated_at ?? timestamp,
+      profile.source_version ?? 0,
+      profile.sync_status ?? "pending",
+    ]
+  );
+}
+
+export async function getUserProfile(userId: string) {
+  const db = await getDb();
+  return db.getFirstAsync<LocalUserProfile>(
+    `
+      SELECT id, full_name, phone, created_at, updated_at, source_version, sync_status
+      FROM user_profiles
+      WHERE id = ?
+      LIMIT 1
+    `,
+    [userId]
+  );
+}
+
+export async function upsertEmergencyContact(contact: LocalEmergencyContact) {
+  const db = await getDb();
+  const timestamp = nowIso();
+  await db.runAsync(
+    `
+      INSERT INTO emergency_contacts
+        (id, user_id, name, phone, telegram_chat_id, telegram_bot_active, created_at, updated_at, source_version, sync_status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        name = excluded.name,
+        phone = excluded.phone,
+        telegram_chat_id = excluded.telegram_chat_id,
+        telegram_bot_active = excluded.telegram_bot_active,
+        updated_at = excluded.updated_at,
+        source_version = excluded.source_version,
+        sync_status = excluded.sync_status
+    `,
+    [
+      contact.id,
+      contact.user_id,
+      contact.name,
+      contact.phone,
+      contact.telegram_chat_id ?? null,
+      contact.telegram_bot_active ? 1 : 0,
+      contact.created_at ?? timestamp,
+      contact.updated_at ?? timestamp,
+      contact.source_version ?? 0,
+      contact.sync_status ?? "pending",
+    ]
+  );
+}
+
+export async function getEmergencyContactByUserId(userId: string) {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{
+    id: string;
+    user_id: string;
+    name: string;
+    phone: string;
+    telegram_chat_id: string | null;
+    telegram_bot_active: number;
+    created_at: string;
+    updated_at: string;
+    source_version: number;
+    sync_status: "pending" | "synced" | "failed";
+  }>(
+    `
+      SELECT id, user_id, name, phone, telegram_chat_id, telegram_bot_active, created_at, updated_at, source_version, sync_status
+      FROM emergency_contacts
+      WHERE user_id = ?
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    name: row.name,
+    phone: row.phone,
+    telegram_chat_id: row.telegram_chat_id,
+    telegram_bot_active: row.telegram_bot_active === 1,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    source_version: row.source_version,
+    sync_status: row.sync_status,
+  } as LocalEmergencyContact;
+}
+
+export async function upsertHeartbeatJournal(heartbeat: LocalHeartbeatJournal) {
+  const db = await getDb();
+  const timestamp = nowIso();
+  await db.runAsync(
+    `
+      INSERT INTO heartbeat_journal
+        (id, user_id, trip_id, timestamp, gps_lat, gps_lng, accuracy_meters, battery_percent, network_status, offline_minutes, source, sync_status, created_at, updated_at, source_version)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        user_id = excluded.user_id,
+        trip_id = excluded.trip_id,
+        timestamp = excluded.timestamp,
+        gps_lat = excluded.gps_lat,
+        gps_lng = excluded.gps_lng,
+        accuracy_meters = excluded.accuracy_meters,
+        battery_percent = excluded.battery_percent,
+        network_status = excluded.network_status,
+        offline_minutes = excluded.offline_minutes,
+        source = excluded.source,
+        sync_status = excluded.sync_status,
+        updated_at = excluded.updated_at,
+        source_version = excluded.source_version
+    `,
+    [
+      heartbeat.id,
+      heartbeat.user_id,
+      heartbeat.trip_id,
+      heartbeat.timestamp,
+      heartbeat.gps_lat ?? null,
+      heartbeat.gps_lng ?? null,
+      heartbeat.accuracy_meters ?? null,
+      heartbeat.battery_percent ?? null,
+      heartbeat.network_status,
+      heartbeat.offline_minutes ?? null,
+      heartbeat.source,
+      heartbeat.sync_status ?? "pending",
+      heartbeat.created_at ?? timestamp,
+      heartbeat.updated_at ?? timestamp,
+      heartbeat.source_version ?? 0,
+    ]
+  );
+}
+
+export async function listRecentHeartbeatJournal(userId: string, tripId: string, limit = 50) {
+  const db = await getDb();
+  return db.getAllAsync<LocalHeartbeatJournal>(
+    `
+      SELECT id, user_id, trip_id, timestamp, gps_lat, gps_lng, accuracy_meters, battery_percent, network_status, offline_minutes, source, sync_status, created_at, updated_at, source_version
+      FROM heartbeat_journal
+      WHERE user_id = ?
+        AND trip_id = ?
+      ORDER BY timestamp DESC
+      LIMIT ?
+    `,
+    [userId, tripId, limit]
+  );
+}
+
+export async function markHeartbeatJournalSynced(heartbeatId: string) {
+  const db = await getDb();
+  await db.runAsync(
+    "UPDATE heartbeat_journal SET sync_status = 'synced', updated_at = ? WHERE id = ?",
+    [nowIso(), heartbeatId]
+  );
 }
 
 export async function enqueueSyncJob(params: {
