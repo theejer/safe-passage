@@ -9,6 +9,8 @@ import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { getLatestItinerary } from "@/features/trips/services/itineraryApi";
 import type { Trip } from "@/features/trips/types";
 import { Button } from "@/shared/components/Button";
+import { useRecentHeartbeats } from "@/features/heartbeat/hooks/useRecentHeartbeats";
+import { HeartbeatList } from "@/features/heartbeat/components/HeartbeatList";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 
@@ -74,6 +76,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const [userId, setUserId] = useState("demo-user");
   const { items, loading, reload } = useTrips(userId);
+  const { heartbeats, loading: heartbeatsLoading, reload: reloadHeartbeats } = useRecentHeartbeats(userId, 5);
 
   useEffect(() => {
     async function loadUserId() {
@@ -100,14 +103,23 @@ export default function DashboardScreen() {
         }
 
         await reload();
+        await reloadHeartbeats();
       }
 
       void refreshOnFocus();
 
+      // Auto-refresh heartbeats every 10 seconds when screen is focused
+      const heartbeatInterval = setInterval(() => {
+        if (!canceled) {
+          void reloadHeartbeats();
+        }
+      }, 10000);
+
       return () => {
         canceled = true;
+        clearInterval(heartbeatInterval);
       };
-    }, [reload, userId])
+    }, [reload, reloadHeartbeats, userId])
   );
 
   return (
@@ -143,6 +155,27 @@ export default function DashboardScreen() {
               </View>
             ))
           : null}
+      </View>
+
+      <View style={{ borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, padding: 12, gap: 8, backgroundColor: "white" }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={{ fontSize: 18, fontWeight: "700" }}>Recent Heartbeats</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {!heartbeatsLoading && heartbeats.length > 0 && (
+              <Text style={{ fontSize: 12, color: "#6b7280" }}>Updates every 10s</Text>
+            )}
+          </View>
+        </View>
+
+        <Text style={{ color: "#6b7280", fontSize: 13 }}>
+          Last 5 heartbeats from active trip. Expand to view details.
+        </Text>
+
+        {heartbeatsLoading ? (
+          <Text style={{ color: "#6b7280" }}>Loading heartbeats...</Text>
+        ) : (
+          <HeartbeatList heartbeats={heartbeats} />
+        )}
       </View>
     </ScrollView>
   );

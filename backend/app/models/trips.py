@@ -172,7 +172,6 @@ def delete_trip_by_id(trip_id: str) -> bool:
     engine = get_db_engine()
     related_trip_tables = [
         "itineraries",
-        "risk_reports",
         "itinerary_risks",
         "heartbeats",
         "alerts",

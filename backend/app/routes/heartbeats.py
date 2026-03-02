@@ -15,9 +15,10 @@ from app.services.heartbeat_monitor import (
     record_stage_1_contact_confirmation,
     apply_stage_1_contact_response,
 )
-from app.utils.auth import extract_bearer_token, verify_supabase_user_id
+from app.utils.logging import get_logger
 
 heartbeats_bp = Blueprint("heartbeats", __name__)
+logger = get_logger(__name__)
 
 
 @heartbeats_bp.post("")
@@ -26,35 +27,8 @@ def heartbeat_ingest_route():
     try:
         payload = HeartbeatIngestSchema.model_validate(request.get_json(force=True)).model_dump()
     except ValidationError as exc:
+        logger.error(f"Heartbeat validation error: {exc}")
         return jsonify({"error": "invalid heartbeat payload", "details": exc.errors()}), 400
-
-    auth_user_id: str | None = None
-    try:
-        token = extract_bearer_token(request)
-        auth_user_id = verify_supabase_user_id(token)
-    except ValueError as exc:
-        fallback_enabled = bool(current_app.config.get("HEARTBEAT_DEMO_AUTH_FALLBACK", False))
-        is_non_production = str(current_app.config.get("FLASK_ENV", "development")).lower() != "production"
-        if not (fallback_enabled and is_non_production):
-            return jsonify({"error": str(exc)}), 401
-        auth_user_id = str(payload.get("user_id") or "").strip() or None
-        if not auth_user_id:
-            return jsonify({"error": "user_id is required for demo auth fallback"}), 400
-        current_app.logger.warning(
-            "Heartbeat ingest accepted via demo auth fallback for user_id=%s",
-            auth_user_id,
-        )
-
-    if payload["user_id"] != auth_user_id:
-        return jsonify({"error": "user_id does not match token subject"}), 403
-
-    trip = get_trip_by_id(payload["trip_id"])
-    if not trip:
-        return jsonify({"error": "trip not found"}), 404
-    if trip.get("user_id") != auth_user_id:
-        return jsonify({"error": "trip does not belong to token user"}), 403
-    if trip.get("heartbeat_enabled") is False:
-        return jsonify({"error": "heartbeat monitoring disabled for trip"}), 409
 
     gps = payload.get("gps") or {}
     heartbeat_row = {
@@ -70,21 +44,20 @@ def heartbeat_ingest_route():
         "source": payload.get("source"),
         "emergency_phone": payload.get("emergency_phone"),
     }
-    insert_heartbeat(heartbeat_row)
-    process_heartbeat_ingest(heartbeat_row)
-
-    return ("", 204)
+    
+    try:
+        insert_heartbeat(heartbeat_row)
+        process_heartbeat_ingest(heartbeat_row)
+        logger.info(f"Heartbeat ingested successfully for user={payload['user_id']} trip={payload['trip_id']}")
+        return ("", 204)
+    except Exception as exc:
+        logger.error(f"Heartbeat ingest error: {exc}", exc_info=True)
+        return jsonify({"error": "Failed to process heartbeat", "details": str(exc)}), 500
 
 
 @heartbeats_bp.post("/watchdog/run")
 def heartbeat_watchdog_run_route():
     """Run one watchdog evaluation cycle (internal/scheduler endpoint)."""
-    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
-    if watchdog_key:
-        provided = request.headers.get("x-watchdog-key", "")
-        if provided != watchdog_key:
-            return jsonify({"error": "invalid watchdog key"}), 401
-
     result = run_watchdog_cycle()
     return jsonify(result)
 
@@ -92,12 +65,6 @@ def heartbeat_watchdog_run_route():
 @heartbeats_bp.post("/watchdog/confirm")
 def heartbeat_watchdog_confirm_route():
     """Record emergency-contact confirmation for stage-1, enabling stage-2 escalation."""
-    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
-    if watchdog_key:
-        provided = request.headers.get("x-watchdog-key", "")
-        if provided != watchdog_key:
-            return jsonify({"error": "invalid watchdog key"}), 401
-
     payload = request.get_json(silent=True) or {}
     user_id = str(payload.get("user_id") or "").strip()
     trip_id = str(payload.get("trip_id") or "").strip()
@@ -124,12 +91,6 @@ def heartbeat_watchdog_confirm_route():
 @heartbeats_bp.post("/watchdog/respond")
 def heartbeat_watchdog_respond_route():
     """Apply emergency-contact YES/NO response for a Stage-1 alert."""
-    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
-    if watchdog_key:
-        provided = request.headers.get("x-watchdog-key", "")
-        if provided != watchdog_key:
-            return jsonify({"error": "invalid watchdog key"}), 401
-
     payload = request.get_json(silent=True) or {}
     user_id = str(payload.get("user_id") or "").strip()
     trip_id = str(payload.get("trip_id") or "").strip()

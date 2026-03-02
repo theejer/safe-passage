@@ -52,7 +52,7 @@ export async function sendHeartbeat(payload: HeartbeatPayload) {
     sync_status: "pending",
   });
 
-  const response = await apiClient.post("/heartbeat", payload);
+  const response = await apiClient.post("/heartbeats", payload);
   await markHeartbeatJournalSynced(heartbeatId);
   return response;
 }

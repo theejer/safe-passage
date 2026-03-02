@@ -1,0 +1,27 @@
+{
+  "$schema": "https://railway.app/schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "context": "./backend",
+    "dockerfilePath": "./backend/Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "./docker-entrypoint.sh",
+    "restartPolicy": "always",
+    "healthchecks": {
+      "liveness": {
+        "command": "curl -f http://localhost:$PORT/health || exit 1",
+        "interval": 30,
+        "timeout": 3,
+        "startPeriod": 10,
+        "successThreshold": 1,
+        "failureThreshold": 3
+      }
+    }
+  },
+  "plugins": [
+    {
+      "source": "https://github.com/railwayapp/starters/tree/main/plugins/postgres"
+    }
+  ]
+}
