@@ -28,17 +28,9 @@ def init_extensions(app: Flask) -> None:
 
     logging.basicConfig(level=logging.INFO)
 
-    url = app.config.get("SUPABASE_URL", "").strip()
-    key = app.config.get("SUPABASE_KEY", "").strip()
-    
-    if url and key and not url.startswith("https://your-"):
-        try:
-            supabase_client = create_client(url, key)
-        except Exception as e:
-            app.logger.warning(f"Supabase initialization failed: {e}. Continuing in degraded mode.")
-    else:
-        app.logger.warning("Supabase credentials are missing or invalid; DB calls may fail.")
-
+    url = app.config.get("SUPABASE_URL")
+    if url and key:
+        supabase_client = create_client(url, key)
     sqlalchemy_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
     if sqlalchemy_uri:
         sqlalchemy_engine = create_engine(sqlalchemy_uri, pool_pre_ping=True)

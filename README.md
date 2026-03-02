@@ -14,6 +14,11 @@ This repository hosts the SafePassage hackathon build: an offline-first safety c
 - Apply `skills/security-best-practices` for emergency, GPS/location, storage, and on-device AI related changes.
 - Use `skills/react-feature-builder` only for explicit legacy web maintenance.
 
+## Feature Guides
+- Heartbeat backend integration and controls: [backend/HEARTBEAT.md](backend/HEARTBEAT.md)
+- Heartbeat frontend runtime and integration: [frontend/src/features/heartbeat/README.md](frontend/src/features/heartbeat/README.md)
+- SQLite/offline storage guide: [frontend/src/features/storage/README.md](frontend/src/features/storage/README.md)
+
 ## Verification Baseline
 Run commands from `frontend` for the new Expo scaffold, and from `my-app` only for legacy surfaces:
 - `npm start`
