@@ -6,16 +6,23 @@ This service coordinates heartbeat ingest side-effects and watchdog checks.
 from __future__ import annotations
 
 import logging
+import math
+from collections.abc import Iterable
 from datetime import datetime, timezone
+from statistics import median
 from uuid import uuid4
 
 from flask import current_app, has_app_context
 
 from app.models.alerts import create_alert_event, has_recent_stage_alert, has_stage_1_confirmation
+from app.models.heartbeats import list_recent_heartbeats
 from app.models.itinerary_segments import list_segments_for_trip
+from app.models.itineraries import get_itinerary
+from app.models.monitoring_expectations import get_latest_monitoring_expectation, upsert_monitoring_expectation
 from app.models.traveler_status import get_status_for_trip, list_open_statuses, update_status, upsert_status
 from app.models.trips import get_trip_alert_context, get_trip_by_id, list_active_heartbeat_trips
 from app.models.users import get_user_by_id
+from app.services.connectivity_predictor import predict_connectivity_for_latlon
 from app.services.notifications import send_telegram_alert
 
 STAGE_1 = "stage_1_initial_alert"
@@ -146,6 +153,326 @@ def derive_expected_offline_minutes(trip_id: str) -> int:
         return 90
 
     return max(15, int(sum(candidate_windows) / len(candidate_windows)))
+
+
+def _safe_parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return _parse_iso(value)
+    except Exception:
+        return None
+
+
+def _safe_parse_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+    sorted_values = sorted(values)
+    if len(sorted_values) == 1:
+        return float(sorted_values[0])
+    rank = (len(sorted_values) - 1) * max(0.0, min(1.0, percentile))
+    low_idx = int(math.floor(rank))
+    high_idx = int(math.ceil(rank))
+    if low_idx == high_idx:
+        return float(sorted_values[low_idx])
+    fraction = rank - low_idx
+    return float(sorted_values[low_idx] + (sorted_values[high_idx] - sorted_values[low_idx]) * fraction)
+
+
+def _circular_hour_gap(hour_a: int, hour_b: int) -> int:
+    diff = abs(hour_a - hour_b)
+    return min(diff, 24 - diff)
+
+
+def _risk_score_for_point(location_type: str | None, is_overnight: bool, hour: int) -> float:
+    normalized_type = (location_type or "").strip().lower()
+    base = 0.5
+    if normalized_type in {"transit", "transfer", "transport"}:
+        base = 0.8
+    elif normalized_type in {"visit", "stop"}:
+        base = 0.45
+    elif normalized_type in {"accommodation", "stay", "hotel"}:
+        base = 0.55
+
+    if is_overnight:
+        base += 0.15
+    if hour >= 20 or hour <= 5:
+        base += 0.2
+
+    return max(0.0, min(1.0, base))
+
+
+def _iter_itinerary_points(itinerary_payload: dict) -> Iterable[dict]:
+    root = itinerary_payload.get("trip") if isinstance(itinerary_payload.get("trip"), dict) else itinerary_payload
+    days = root.get("days") if isinstance(root, dict) else None
+    if not isinstance(days, list):
+        return []
+
+    points: list[dict] = []
+    for day in days:
+        if not isinstance(day, dict):
+            continue
+        day_date = _safe_parse_date(day.get("date"))
+        locations = day.get("locations") if isinstance(day.get("locations"), list) else []
+        for location in locations:
+            if not isinstance(location, dict):
+                continue
+            geo = location.get("geo") if isinstance(location.get("geo"), dict) else {}
+            risk_queries = location.get("risk_queries") if isinstance(location.get("risk_queries"), dict) else {}
+            time_payload = location.get("time") if isinstance(location.get("time"), dict) else {}
+            points.append(
+                {
+                    "day_date": day_date,
+                    "name": location.get("name") or location.get("raw_text") or "location",
+                    "location_type": location.get("type"),
+                    "is_overnight": bool(risk_queries.get("is_overnight", False)),
+                    "lat": geo.get("lat"),
+                    "lng": geo.get("lng"),
+                    "start_at": _safe_parse_dt(time_payload.get("start_local")),
+                    "end_at": _safe_parse_dt(time_payload.get("end_local")),
+                }
+            )
+
+        accommodation = day.get("accommodation") if isinstance(day.get("accommodation"), dict) else None
+        if accommodation:
+            geo = accommodation.get("geo") if isinstance(accommodation.get("geo"), dict) else {}
+            risk_queries = accommodation.get("risk_queries") if isinstance(accommodation.get("risk_queries"), dict) else {}
+            time_payload = accommodation.get("time") if isinstance(accommodation.get("time"), dict) else {}
+            points.append(
+                {
+                    "day_date": day_date,
+                    "name": accommodation.get("name") or accommodation.get("raw_text") or "accommodation",
+                    "location_type": "accommodation",
+                    "is_overnight": bool(risk_queries.get("is_overnight", True)),
+                    "lat": geo.get("lat"),
+                    "lng": geo.get("lng"),
+                    "start_at": _safe_parse_dt(time_payload.get("checkin_local")),
+                    "end_at": _safe_parse_dt(time_payload.get("checkout_local")),
+                }
+            )
+
+    return points
+
+
+def _connectivity_component_from_itinerary(trip_id: str, now_utc: datetime, baseline_expected: int) -> dict:
+    try:
+        itinerary_row = get_itinerary(trip_id)
+    except Exception:
+        itinerary_row = {}
+
+    itinerary_payload = itinerary_row.get("itinerary_json") if isinstance(itinerary_row, dict) else None
+    if not isinstance(itinerary_payload, dict):
+        return {
+            "expected_offline_minutes": float(baseline_expected),
+            "confidence": 0.0,
+            "risk_score": 0.5,
+            "anchor": "itinerary-unavailable",
+        }
+
+    weighted_expected = 0.0
+    weighted_confidence = 0.0
+    weighted_risk = 0.0
+    total_weight = 0.0
+    anchor_name = "dynamic_window"
+    best_weight = -1.0
+
+    for point in _iter_itinerary_points(itinerary_payload):
+        lat = point.get("lat")
+        lng = point.get("lng")
+        if lat is None or lng is None:
+            continue
+
+        try:
+            prediction = predict_connectivity_for_latlon(float(lat), float(lng))
+        except Exception:
+            continue
+
+        day_gap = 0
+        if isinstance(point.get("day_date"), datetime):
+            day_gap = abs((point["day_date"].date() - now_utc.date()).days)
+
+        point_hour = now_utc.hour
+        if isinstance(point.get("start_at"), datetime):
+            point_hour = point["start_at"].hour
+
+        hour_gap = _circular_hour_gap(now_utc.hour, point_hour)
+        day_weight = 1.0 / (1.0 + day_gap)
+        time_weight = math.exp(-((hour_gap**2) / (2.0 * (6.0**2))))
+        weight = day_weight * time_weight
+
+        risk_score = _risk_score_for_point(
+            point.get("location_type"),
+            bool(point.get("is_overnight", False)),
+            point_hour,
+        )
+        risk_adjustment = 1.0 - (0.20 * risk_score)
+        point_expected = float(prediction.get("expected_offline_minutes", baseline_expected)) * risk_adjustment
+        point_confidence = float(prediction.get("confidence", 0.0))
+
+        weighted_expected += point_expected * weight
+        weighted_confidence += point_confidence * weight
+        weighted_risk += risk_score * weight
+        total_weight += weight
+
+        if weight > best_weight:
+            best_weight = weight
+            anchor_name = str(point.get("name") or "dynamic_window")
+
+    if total_weight <= 0:
+        return {
+            "expected_offline_minutes": float(baseline_expected),
+            "confidence": 0.0,
+            "risk_score": 0.5,
+            "anchor": "itinerary-no-geo",
+        }
+
+    return {
+        "expected_offline_minutes": weighted_expected / total_weight,
+        "confidence": weighted_confidence / total_weight,
+        "risk_score": weighted_risk / total_weight,
+        "anchor": anchor_name,
+    }
+
+
+def _history_component(user_id: str) -> dict:
+    try:
+        heartbeats = list_recent_heartbeats(user_id, limit=120)
+    except Exception:
+        heartbeats = []
+
+    if not heartbeats:
+        return {
+            "expected_offline_minutes": 0.0,
+            "reliability": 0.0,
+            "volatility": 0.0,
+        }
+
+    parsed = []
+    for row in heartbeats:
+        timestamp = _safe_parse_dt(row.get("timestamp"))
+        if timestamp:
+            parsed.append((timestamp, row))
+
+    parsed.sort(key=lambda item: item[0])
+
+    gaps = []
+    for idx in range(1, len(parsed)):
+        gap_min = (parsed[idx][0] - parsed[idx - 1][0]).total_seconds() / 60.0
+        if 0 < gap_min <= 720:
+            gaps.append(gap_min)
+
+    reported_offline = []
+    for _, row in parsed:
+        offline_val = row.get("offline_minutes")
+        if isinstance(offline_val, (int, float)) and 0 < float(offline_val) <= 720:
+            reported_offline.append(float(offline_val))
+
+    p75_gap = _percentile(gaps, 0.75) if gaps else 0.0
+    p75_offline = _percentile(reported_offline, 0.75) if reported_offline else 0.0
+    history_expected = max(p75_gap, p75_offline, 0.0)
+
+    reliability = min(1.0, len(gaps) / 24.0)
+    if gaps:
+        median_gap = max(1.0, median(gaps))
+        iqr_gap = _percentile(gaps, 0.75) - _percentile(gaps, 0.25)
+        volatility = max(0.0, iqr_gap / median_gap)
+    else:
+        volatility = 0.0
+
+    return {
+        "expected_offline_minutes": history_expected,
+        "reliability": reliability,
+        "volatility": min(2.0, volatility),
+    }
+
+
+def derive_monitoring_expectation(status: dict, trip_id: str, now_utc: datetime) -> dict:
+    """Compute smoothed expected offline window and persistence payload for watchdog.
+
+    Factors:
+    - itinerary day/time context (including adjacent periods)
+    - deterministic connectivity prediction around planned geo points
+    - recent heartbeat history and volatility
+    - previous expectation smoothing to avoid abrupt threshold shifts
+    """
+    baseline_expected = float(derive_expected_offline_minutes(trip_id))
+    connectivity_component = _connectivity_component_from_itinerary(trip_id, now_utc, int(baseline_expected))
+
+    user_id = str(status.get("user_id") or "")
+    history_component = _history_component(user_id) if user_id else {
+        "expected_offline_minutes": 0.0,
+        "reliability": 0.0,
+        "volatility": 0.0,
+    }
+
+    history_reliability = float(history_component.get("reliability", 0.0))
+    if history_reliability > 0:
+        raw_expected = (
+            (0.50 * float(connectivity_component.get("expected_offline_minutes", baseline_expected)))
+            + (0.35 * float(history_component.get("expected_offline_minutes", 0.0)))
+            + (0.15 * baseline_expected)
+        )
+    else:
+        raw_expected = (
+            (0.75 * float(connectivity_component.get("expected_offline_minutes", baseline_expected)))
+            + (0.25 * baseline_expected)
+        )
+
+    try:
+        previous = get_latest_monitoring_expectation(trip_id)
+    except Exception:
+        previous = {}
+
+    previous_expected = previous.get("expected_offline_minutes") if isinstance(previous, dict) else None
+    if isinstance(previous_expected, (int, float)) and previous_expected > 0:
+        smoothed_expected = (0.35 * raw_expected) + (0.65 * float(previous_expected))
+    else:
+        smoothed_expected = raw_expected
+
+    smoothed_expected = max(15.0, min(240.0, smoothed_expected))
+
+    contextual_risk = float(connectivity_component.get("risk_score", 0.5))
+    connectivity_confidence = float(connectivity_component.get("confidence", 0.0))
+    volatility = float(history_component.get("volatility", 0.0))
+
+    threshold_multiplier = 1.50
+    threshold_multiplier -= contextual_risk * 0.25
+    threshold_multiplier += max(0.0, 0.45 - connectivity_confidence) * 0.40
+    threshold_multiplier += min(0.25, volatility * 0.20)
+    threshold_multiplier -= min(0.10, history_reliability * 0.10)
+    threshold_multiplier = max(1.20, min(2.00, threshold_multiplier))
+
+    location_name = str(connectivity_component.get("anchor") or "dynamic_window")[:120]
+
+    persisted = None
+    try:
+        persisted = upsert_monitoring_expectation(
+            trip_id=trip_id,
+            location_name=location_name,
+            expected_offline_minutes=int(round(smoothed_expected)),
+            threshold_multiplier=round(threshold_multiplier, 2),
+        )
+    except Exception as exc:
+        logger.warning("[watchdog] expectation_persist_failed trip_id=%s error=%s", trip_id, exc)
+
+    return {
+        "expected_offline_minutes": int(round(smoothed_expected)),
+        "threshold_multiplier": round(threshold_multiplier, 2),
+        "location_name": location_name,
+        "confidence": round(connectivity_confidence, 3),
+        "history_reliability": round(history_reliability, 3),
+        "volatility": round(volatility, 3),
+        "persisted": persisted,
+    }
 
 
 def _build_recipients(user: dict, emergency_phone: str | None) -> list[dict]:
@@ -560,11 +887,13 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
     stage_2_threshold = 0
 
     if not force_stage_1_test_mode:
-        expected = derive_expected_offline_minutes(trip_id)
+        expectation = derive_monitoring_expectation(status, trip_id, now_utc)
+        expected = int(expectation.get("expected_offline_minutes", derive_expected_offline_minutes(trip_id)))
+        threshold_multiplier = float(expectation.get("threshold_multiplier", 1.5))
         multiplier = _risk_multiplier(connectivity_risk, battery_percent, now_utc)
         adjusted_expected = max(15, int(expected * multiplier))
-        stage_1_threshold = adjusted_expected
-        stage_2_threshold = max(int(adjusted_expected * 1.8), adjusted_expected + 30)
+        stage_1_threshold = max(15, int(adjusted_expected * threshold_multiplier))
+        stage_2_threshold = max(int(stage_1_threshold * 1.8), stage_1_threshold + 30)
 
     current_stage = status.get("current_stage", "none")
     trigger_stage = "none"

@@ -918,3 +918,195 @@ def test_stage2_triggers_after_contact_confirmation(monkeypatch):
     assert created_alerts[0]["stage"] == heartbeat_monitor.STAGE_2
     assert len(sent_telegram) == 1
     assert any(item["updates"].get("current_stage") == heartbeat_monitor.STAGE_2 for item in status_updates)
+
+
+def test_derive_monitoring_expectation_blends_connectivity_history_and_persists(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(heartbeat_monitor, "derive_expected_offline_minutes", lambda _trip_id: 90)
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_itinerary",
+        lambda _trip_id: {
+            "itinerary_json": {
+                "trip": {
+                    "days": [
+                        {
+                            "date": "2026-03-02",
+                            "locations": [
+                                {
+                                    "type": "visit",
+                                    "name": "Patna",
+                                    "geo": {"lat": 25.5941, "lng": 85.1376},
+                                    "time": {"start_local": "2026-03-02T11:30:00+05:30"},
+                                    "risk_queries": {"is_overnight": False},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "predict_connectivity_for_latlon",
+        lambda _lat, _lng: {
+            "expected_offline_minutes": 80,
+            "confidence": 0.72,
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "list_recent_heartbeats",
+        lambda _user_id, limit=120: [
+            {"timestamp": "2026-03-02T08:00:00Z", "offline_minutes": 20},
+            {"timestamp": "2026-03-02T07:10:00Z", "offline_minutes": 35},
+            {"timestamp": "2026-03-02T06:20:00Z", "offline_minutes": 30},
+            {"timestamp": "2026-03-02T05:20:00Z", "offline_minutes": 40},
+        ],
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_latest_monitoring_expectation",
+        lambda _trip_id: {
+            "expected_offline_minutes": 100,
+            "threshold_multiplier": 1.55,
+        },
+    )
+
+    persisted_payload: dict = {}
+
+    def _fake_upsert_monitoring_expectation(**kwargs):
+        persisted_payload.update(kwargs)
+        return kwargs
+
+    monkeypatch.setattr(heartbeat_monitor, "upsert_monitoring_expectation", _fake_upsert_monitoring_expectation)
+
+    result = heartbeat_monitor.derive_monitoring_expectation(
+        status={"user_id": "usr_1"},
+        trip_id="trp_1",
+        now_utc=now,
+    )
+
+    assert 15 <= result["expected_offline_minutes"] <= 240
+    assert 1.2 <= result["threshold_multiplier"] <= 2.0
+    assert persisted_payload["trip_id"] == "trp_1"
+    assert "location_name" in persisted_payload
+
+
+def test_monitoring_expectation_calculation_demo_prints(monkeypatch):
+    """Demonstrate expectation outputs for multiple factor profiles.
+
+    Run with `-s` to see printed values in terminal.
+    """
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    scenarios = [
+        {
+            "name": "high-risk-poor-connectivity",
+            "baseline": 90,
+            "prediction": {"expected_offline_minutes": 130, "confidence": 0.22},
+            "heartbeats": [
+                {"timestamp": "2026-03-02T11:30:00Z", "offline_minutes": 80},
+                {"timestamp": "2026-03-02T10:10:00Z", "offline_minutes": 95},
+                {"timestamp": "2026-03-02T08:50:00Z", "offline_minutes": 70},
+                {"timestamp": "2026-03-02T07:35:00Z", "offline_minutes": 105},
+            ],
+            "previous": {"expected_offline_minutes": 120, "threshold_multiplier": 1.72},
+            "location_type": "transit",
+            "is_overnight": True,
+        },
+        {
+            "name": "low-risk-good-connectivity",
+            "baseline": 90,
+            "prediction": {"expected_offline_minutes": 28, "confidence": 0.9},
+            "heartbeats": [
+                {"timestamp": "2026-03-02T11:50:00Z", "offline_minutes": 10},
+                {"timestamp": "2026-03-02T11:35:00Z", "offline_minutes": 8},
+                {"timestamp": "2026-03-02T11:20:00Z", "offline_minutes": 12},
+                {"timestamp": "2026-03-02T11:05:00Z", "offline_minutes": 9},
+            ],
+            "previous": {"expected_offline_minutes": 40, "threshold_multiplier": 1.35},
+            "location_type": "visit",
+            "is_overnight": False,
+        },
+        {
+            "name": "sparse-history-moderate-connectivity",
+            "baseline": 90,
+            "prediction": {"expected_offline_minutes": 55, "confidence": 0.45},
+            "heartbeats": [],
+            "previous": {},
+            "location_type": "visit",
+            "is_overnight": False,
+        },
+    ]
+
+    printed_rows: list[dict] = []
+
+    for scenario in scenarios:
+        monkeypatch.setattr(heartbeat_monitor, "derive_expected_offline_minutes", lambda _trip_id, s=scenario: s["baseline"])
+        monkeypatch.setattr(
+            heartbeat_monitor,
+            "get_itinerary",
+            lambda _trip_id, s=scenario: {
+                "itinerary_json": {
+                    "trip": {
+                        "days": [
+                            {
+                                "date": "2026-03-02",
+                                "locations": [
+                                    {
+                                        "type": s["location_type"],
+                                        "name": "Demo Point",
+                                        "geo": {"lat": 25.6, "lng": 85.1},
+                                        "time": {"start_local": "2026-03-02T11:30:00+05:30"},
+                                        "risk_queries": {"is_overnight": s["is_overnight"]},
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                }
+            },
+        )
+        monkeypatch.setattr(
+            heartbeat_monitor,
+            "predict_connectivity_for_latlon",
+            lambda _lat, _lng, s=scenario: s["prediction"],
+        )
+        monkeypatch.setattr(
+            heartbeat_monitor,
+            "list_recent_heartbeats",
+            lambda _user_id, limit=120, s=scenario: s["heartbeats"],
+        )
+        monkeypatch.setattr(
+            heartbeat_monitor,
+            "get_latest_monitoring_expectation",
+            lambda _trip_id, s=scenario: s["previous"],
+        )
+        monkeypatch.setattr(
+            heartbeat_monitor,
+            "upsert_monitoring_expectation",
+            lambda **kwargs: kwargs,
+        )
+
+        result = heartbeat_monitor.derive_monitoring_expectation(
+            status={"user_id": "usr_1"},
+            trip_id="trp_1",
+            now_utc=now,
+        )
+
+        row = {
+            "scenario": scenario["name"],
+            "expected_offline_minutes": result["expected_offline_minutes"],
+            "threshold_multiplier": result["threshold_multiplier"],
+            "confidence": result["confidence"],
+            "history_reliability": result["history_reliability"],
+            "volatility": result["volatility"],
+            "location_name": result["location_name"],
+        }
+        printed_rows.append(row)
+        print(f"[expectation-demo] {row}")
+
+    assert len(printed_rows) == 3
+    assert printed_rows[0]["expected_offline_minutes"] > printed_rows[1]["expected_offline_minutes"]

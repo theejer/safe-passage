@@ -40,6 +40,7 @@ def _ensure_trips_table_for_sqlite() -> None:
             id TEXT PRIMARY KEY,
             user_id TEXT NOT NULL,
             title TEXT NOT NULL,
+            trip_planned INTEGER NOT NULL DEFAULT 1,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
             heartbeat_enabled INTEGER NOT NULL DEFAULT 1,
@@ -59,11 +60,19 @@ def create_trip(payload: dict) -> dict:
         "id": trip_id,
         "user_id": payload.get("user_id"),
         "title": payload.get("title"),
+        "trip_planned": payload.get("trip_planned", True),
         "start_date": payload.get("start_date"),
         "end_date": payload.get("end_date"),
         "heartbeat_enabled": payload.get("heartbeat_enabled", True),
     }
 
+    query_with_flags = text(
+        """
+        INSERT INTO trips (id, user_id, title, trip_planned, start_date, end_date, heartbeat_enabled)
+        VALUES (:id, :user_id, :title, :trip_planned, :start_date, :end_date, :heartbeat_enabled)
+        RETURNING *
+        """
+    )
     query_with_heartbeat = text(
         """
         INSERT INTO trips (id, user_id, title, start_date, end_date, heartbeat_enabled)
@@ -84,13 +93,22 @@ def create_trip(payload: dict) -> dict:
     def _insert_once():
         with engine.begin() as connection:
             try:
-                result = connection.execute(query_with_heartbeat, params)
+                result = connection.execute(query_with_flags, params)
                 return result.mappings().first()
             except (ProgrammingError, OperationalError) as exc:
-                if not _is_missing_column_error(exc, "heartbeat_enabled"):
-                    raise
-                result = connection.execute(query_without_heartbeat, params)
-                return result.mappings().first()
+                if _is_missing_column_error(exc, "trip_planned"):
+                    try:
+                        result = connection.execute(query_with_heartbeat, params)
+                        return result.mappings().first()
+                    except (ProgrammingError, OperationalError) as inner_exc:
+                        if not _is_missing_column_error(inner_exc, "heartbeat_enabled"):
+                            raise
+                        result = connection.execute(query_without_heartbeat, params)
+                        return result.mappings().first()
+                if _is_missing_column_error(exc, "heartbeat_enabled"):
+                    result = connection.execute(query_without_heartbeat, params)
+                    return result.mappings().first()
+                raise
 
     try:
         row = _insert_once()
@@ -101,6 +119,7 @@ def create_trip(payload: dict) -> dict:
         row = _insert_once()
 
     fallback = dict(row) if row else {}
+    fallback.setdefault("trip_planned", payload.get("trip_planned", True))
     fallback.setdefault("heartbeat_enabled", payload.get("heartbeat_enabled", True))
     return fallback
 
@@ -175,6 +194,16 @@ def get_trip_alert_context(trip_id: str) -> dict:
 
 def list_active_heartbeat_trips(today_iso_date: str) -> list[dict]:
     """List trips currently active and opted into heartbeat monitoring."""
+    query_with_flags = text(
+        """
+        SELECT *
+        FROM trips
+        WHERE heartbeat_enabled = TRUE
+          AND trip_planned = TRUE
+          AND start_date <= :today_iso_date
+          AND end_date >= :today_iso_date
+        """
+    )
     query_with_heartbeat = text(
         """
         SELECT *
@@ -194,11 +223,13 @@ def list_active_heartbeat_trips(today_iso_date: str) -> list[dict]:
     )
     with get_db_engine().begin() as connection:
         try:
-            result = connection.execute(query_with_heartbeat, {"today_iso_date": today_iso_date})
+            result = connection.execute(query_with_flags, {"today_iso_date": today_iso_date})
         except (ProgrammingError, OperationalError) as exc:
             if _is_missing_table_error(exc, "trips"):
                 _ensure_trips_table_for_sqlite()
                 result = connection.execute(query_without_heartbeat, {"today_iso_date": today_iso_date})
+            elif _is_missing_column_error(exc, "trip_planned"):
+                result = connection.execute(query_with_heartbeat, {"today_iso_date": today_iso_date})
             elif not _is_missing_column_error(exc, "heartbeat_enabled"):
                 raise
             else:
@@ -207,6 +238,7 @@ def list_active_heartbeat_trips(today_iso_date: str) -> list[dict]:
     output: list[dict] = []
     for row in rows:
         row_dict = dict(row)
+        row_dict.setdefault("trip_planned", True)
         row_dict.setdefault("heartbeat_enabled", True)
         output.append(row_dict)
     return output

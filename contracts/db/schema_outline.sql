@@ -30,6 +30,7 @@ create table if not exists trips (
   id uuid primary key,
   user_id uuid not null references users(id) on delete cascade,
   title text not null,
+  trip_planned boolean not null default true,
   start_date date not null,
   end_date date not null,
   destination_country text,
@@ -262,6 +263,7 @@ create table if not exists incident_sync_jobs (
 -- Index Suggestions
 -- =====================================
 create index if not exists idx_trips_user_id on trips(user_id);
+create index if not exists idx_trips_planned on trips(trip_planned);
 create index if not exists idx_trips_destination_country on trips(destination_country);
 create index if not exists idx_itinerary_days_trip_order on itinerary_days(trip_id, day_order);
 create index if not exists idx_itinerary_locations_day_order on itinerary_locations(day_id, location_order);
