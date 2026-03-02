@@ -51,7 +51,7 @@ These are the minimum remaining tasks to deliver the full user story demo.
 
 - [ ] Make frontend and backend agree on one risk read path.
   - Current mismatch:
-    - Frontend calls `GET /trips/{tripId}/risk` in `frontend/src/features/risk/services/riskApi.ts`.
+    - Frontend currently reads `GET /api/reports?trip_id={tripId}` in `frontend/src/features/risk/services/riskApi.ts`.
     - Backend currently uses `backend/app/routes/itinerary_analysis.py` and `backend/app/routes/reports.py`.
   - Integration with done features:
     - Keeps existing `RiskCategoryList` and local risk cache working.
@@ -75,6 +75,17 @@ These are the minimum remaining tasks to deliver the full user story demo.
     - Reuses watchdog stage events from `heartbeat_monitor.py`.
   - Done when:
     - Stage 1/2 visibly generates external alert evidence.
+
+### P0-4: Heartbeat auth policy for hackathon demo (CURE unblocker)
+
+- [x] Add demo-safe fallback for `/heartbeat` in dev/demo mode.
+  - Implemented:
+    - `backend/app/routes/heartbeats.py`
+    - `backend/app/config.py` (`HEARTBEAT_DEMO_AUTH_FALLBACK`)
+    - `backend/tests/test_heartbeat_monitor.py`
+  - Behavior:
+    - Production keeps strict bearer-token auth.
+    - Non-production can accept heartbeat without bearer token only when `HEARTBEAT_DEMO_AUTH_FALLBACK=1`.
 
 ---
 
@@ -100,6 +111,19 @@ These are the minimum remaining tasks to deliver the full user story demo.
 - [ ] Long-term schema migrations and data governance workflows.
 
 Reason: these are important for production but not required to prove the core user story in a one-day event.
+
+---
+
+## Repo Cleanup (High-Confidence Only)
+
+- [x] Remove unreferenced duplicate form component from legacy trips feature surface.
+  - Removed: `frontend/src/features/trips/components/UserInfoForm.tsx`
+
+- [x] Remove generated Python cache artifact from repo.
+  - Removed: `telegram-bot/__pycache__/bot.cpython-314.pyc`
+
+- [x] Expand ignore rules to prevent cache re-commits.
+  - Updated: `.gitignore` for `__pycache__/` and `telegram-bot` Python artifacts.
 
 ---
 
