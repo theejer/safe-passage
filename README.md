@@ -64,6 +64,33 @@ Legacy/compatibility commands in `my-app`:
 - `npm run typecheck` (if present)
 - `npx expo-doctor`
 
+## Docker Quick Start (Backend)
+
+From repository root:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+docker compose up --build backend
+```
+
+Backend will be available at `http://localhost:5000`.
+
+### PowerShell helper (one-liner workflow)
+
+From repository root:
+
+```powershell
+./scripts/backend-docker.ps1 -Action up
+```
+
+Other common actions:
+
+```powershell
+./scripts/backend-docker.ps1 -Action status
+./scripts/backend-docker.ps1 -Action logs
+./scripts/backend-docker.ps1 -Action down
+```
+
 ## Environment Setup
 
 Use the provided example files as templates:
