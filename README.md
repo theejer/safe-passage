@@ -19,6 +19,38 @@ This repository hosts the SafePassage hackathon build: an offline-first safety c
 - Heartbeat frontend runtime and integration: [frontend/src/features/heartbeat/README.md](frontend/src/features/heartbeat/README.md)
 - SQLite/offline storage guide: [frontend/src/features/storage/README.md](frontend/src/features/storage/README.md)
 
+## Deterministic Connectivity Predictor (Standalone)
+
+A reusable service module is available at `backend/app/services/connectivity_predictor.py`.
+
+- Function signature: `predict_connectivity_for_latlon(latitude: float, longitude: float) -> dict`
+- Dataset location (colocated): `backend/app/services/data/signal_metrics.csv`
+- Grouping bands:
+	- `Poor`: 0-24
+	- `Average`: 25-49
+	- `Good`: 50-74
+	- `Excellent`: 75-100
+
+Returned fields include:
+- `connectivity_score` (0-100)
+- `connectivity_group`
+- `expected_connectivity`
+- `expected_offline_minutes`
+- `confidence`
+- `data_points_used`
+- `nearest_distance_km`
+- `is_sparse`
+- `fallback_reason`
+
+Minimal usage example (from `backend` working directory):
+
+```python
+from app.services.connectivity_predictor import predict_connectivity_for_latlon
+
+result = predict_connectivity_for_latlon(25.6009, 85.1452)
+print(result["connectivity_score"], result["connectivity_group"], result["expected_offline_minutes"])
+```
+
 ## Verification Baseline
 Run commands from `frontend` for the new Expo scaffold, and from `my-app` only for legacy surfaces:
 - `npm start`
