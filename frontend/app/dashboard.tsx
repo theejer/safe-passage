@@ -1,11 +1,68 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTrips } from "@/features/trips/hooks/useTrips";
 import { getItem } from "@/features/storage/services/localStore";
+import { useRiskReport } from "@/features/risk/hooks/useRiskReport";
+import { analyzeTripRisk } from "@/features/risk/services/riskApi";
+import { getLatestItinerary } from "@/features/trips/services/itineraryApi";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
+
+function DashboardTripScore({ tripId }: { tripId: string }) {
+  const { report, loading } = useRiskReport(tripId);
+
+  if (loading) return <Text style={{ color: "#6b7280" }}>Score: ...</Text>;
+  if (!report?.score) return <Text style={{ color: "#6b7280" }}>Score: Not generated</Text>;
+
+  return (
+    <Text style={{ color: "#111827", fontWeight: "600" }}>
+      Score: {report.score.value}/100
+    </Text>
+  );
+}
+
+function DashboardTripActions({ tripId }: { tripId: string }) {
+  const router = useRouter();
+  const [generatingScore, setGeneratingScore] = useState(false);
+
+  async function onGenerateScore() {
+    if (!tripId) {
+      Alert.alert("Missing trip", "Trip ID is missing.");
+      return;
+    }
+
+    try {
+      setGeneratingScore(true);
+      const days = await getLatestItinerary(tripId);
+      if (!days.length) {
+        Alert.alert("No itinerary yet", "Add or import itinerary first, then generate score.");
+        return;
+      }
+
+      const report = await analyzeTripRisk(tripId, days);
+      Alert.alert("Score ready", report.summary || "Risk analysis completed.");
+      router.push(`/trips/${tripId}/risk`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate score";
+      Alert.alert("Score generation failed", message);
+    } finally {
+      setGeneratingScore(false);
+    }
+  }
+
+  return (
+    <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
+      <Link href={`/trips/${tripId}`}>View Trip</Link>
+      <Link href={`/trips/${tripId}/edit`}>Edit Trip</Link>
+      <TouchableOpacity onPress={() => void onGenerateScore()} disabled={generatingScore}>
+        <Text style={{ color: "#2563eb" }}>{generatingScore ? "Generating Score..." : "Generate Score"}</Text>
+      </TouchableOpacity>
+      <Link href={`/trips/${tripId}/risk`}>Open Risk</Link>
+    </View>
+  );
+}
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -80,11 +137,8 @@ export default function DashboardScreen() {
                 <Text style={{ color: "#4b5563" }}>
                   {trip.startDate} → {trip.endDate}
                 </Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  <Link href={`/trips/${trip.id}`}>View Trip</Link>
-                  <Link href={`/trips/${trip.id}/start`}>Start Trip</Link>
-                  <Link href={`/trips/${trip.id}/risk`}>Open Risk</Link>
-                </View>
+                <DashboardTripScore tripId={trip.id} />
+                <DashboardTripActions tripId={trip.id} />
               </View>
             ))
           : null}
