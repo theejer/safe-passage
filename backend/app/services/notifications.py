@@ -12,7 +12,8 @@ import time
 import requests
 from flask import Flask
 
-from app.models.users import activate_telegram_contact_by_phone
+from app.models.traveler_status import list_open_stage_1_trip_ids_for_user
+from app.models.users import activate_telegram_contact_by_phone, get_emergency_contact_context_by_chat_id
 
 _poller_thread: threading.Thread | None = None
 _poller_stop_event: threading.Event | None = None
@@ -52,6 +53,21 @@ def _extract_phone_from_start_command(text: str) -> str:
         return ""
 
     return re.sub(r"[^0-9+]", "", remainder)
+
+
+def _parse_stage_1_reply(text: str) -> tuple[bool, str | None] | None:
+    """Parse `YES`/`NO` optionally followed by a trip id."""
+    message_text = (text or "").strip()
+    if not message_text:
+        return None
+
+    match = re.match(r"^(YES|NO)(?:\s+([0-9a-fA-F-]{36}))?$", message_text, flags=re.IGNORECASE)
+    if not match:
+        return None
+
+    can_contact = match.group(1).upper() == "YES"
+    trip_id = match.group(2)
+    return can_contact, trip_id
 
 
 def _safe_send_message(bot_token: str, chat_id: str, text: str) -> None:
@@ -100,6 +116,77 @@ def _handle_update(app: Flask, bot_token: str, update: dict) -> None:
             chat_id,
             "SafePassage bot connected. Please send your phone number to activate emergency alerts.",
         )
+        return
+
+    stage_1_reply = _parse_stage_1_reply(text)
+    if stage_1_reply:
+        can_contact, trip_id = stage_1_reply
+        contact_context = get_emergency_contact_context_by_chat_id(chat_id)
+        if not contact_context:
+            _safe_send_message(
+                bot_token,
+                chat_id,
+                "This chat is not linked to an active emergency contact. Please activate with /start <your_phone_number>.",
+            )
+            return
+
+        user_id = str(contact_context.get("user_id") or "")
+        contact_name = str(contact_context.get("contact_name") or "Emergency Contact")
+
+        if not trip_id:
+            open_stage_1_trip_ids = list_open_stage_1_trip_ids_for_user(user_id)
+            if len(open_stage_1_trip_ids) == 1:
+                trip_id = open_stage_1_trip_ids[0]
+            elif len(open_stage_1_trip_ids) > 1:
+                _safe_send_message(
+                    bot_token,
+                    chat_id,
+                    "Multiple active Stage 1 alerts found. Please reply as YES <trip_id> or NO <trip_id>.",
+                )
+                return
+            else:
+                _safe_send_message(
+                    bot_token,
+                    chat_id,
+                    "No active Stage 1 alert found right now.",
+                )
+                return
+
+        try:
+            with app.app_context():
+                from app.services.heartbeat_monitor import apply_stage_1_contact_response
+
+                result = apply_stage_1_contact_response(
+                    user_id=user_id,
+                    trip_id=trip_id,
+                    can_contact=can_contact,
+                    confirmed_by=contact_name,
+                    source="telegram",
+                )
+        except Exception as exc:
+            app.logger.warning(f"Failed processing stage-1 Telegram response: {exc}")
+            _safe_send_message(bot_token, chat_id, "Sorry, we could not process your response. Please try again.")
+            return
+
+        status = str(result.get("status") or "")
+        if status in {"deescalated", "escalated", "confirmed", "deduped"}:
+            _safe_send_message(
+                bot_token,
+                chat_id,
+                "Thanks. Your response has been recorded.",
+            )
+        elif status == "ignored-stage-mismatch":
+            _safe_send_message(
+                bot_token,
+                chat_id,
+                "This trip is no longer in Stage 1, so no action was applied.",
+            )
+        else:
+            _safe_send_message(
+                bot_token,
+                chat_id,
+                "Could not apply response for this trip right now.",
+            )
         return
 
     phone = _extract_phone_from_message(message)

@@ -17,7 +17,7 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
 
   if (editingIndex !== null) {
     return (
-      <View style={{ flex: 1, padding: 16 }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
         <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 16 }}>Edit Day {editingIndex + 1}</Text>
         <DayEditor
           dayIndex={editingIndex}
@@ -34,12 +34,12 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
             setEditingIndex(null);
           }}
         />
-      </View>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Text style={{ fontSize: 18, fontWeight: "700" }}>Extracted Itinerary ({days.length} days)</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -72,7 +72,7 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1, marginBottom: 16 }}>
+      <View style={{ marginBottom: 16 }}>
         {viewMode === "table" ? (
           // TABLE VIEW
           <View style={{ borderWidth: 1, borderColor: "#ddd", borderRadius: 8, overflow: "hidden" }}>
@@ -162,7 +162,7 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
             ))}
           </>
         )}
-      </ScrollView>
+      </View>
 
       <View style={{ gap: 8, flexDirection: "row" }}>
         <Button
@@ -179,6 +179,6 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
           onPress={() => onCheckRisk(days)}
         />
       </View>
-    </View>
+    </ScrollView>
   );
 }

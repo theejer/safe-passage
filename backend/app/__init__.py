@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.triggers.interval import IntervalTrigger
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 
 from app.config import get_config
@@ -34,6 +34,24 @@ def create_app(config_name: str | None = None) -> Flask:
         allow_headers=["Authorization", "Content-Type"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
+
+    @app.after_request
+    def _ensure_cors_headers(response):
+        origin = request.headers.get("Origin")
+        allowed_origins = app.config.get("CORS_ORIGINS", ["*"])
+        if origin and ("*" in allowed_origins or origin in allowed_origins):
+            response.headers.setdefault("Access-Control-Allow-Origin", origin if origin else "*")
+            response.headers.setdefault("Vary", "Origin")
+            response.headers.setdefault(
+                "Access-Control-Allow-Headers",
+                "Authorization, Content-Type",
+            )
+            response.headers.setdefault(
+                "Access-Control-Allow-Methods",
+                "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            )
+        return response
+
     app.register_blueprint(reports_bp)
     init_extensions(app)
 

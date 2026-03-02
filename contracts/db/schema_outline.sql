@@ -1,5 +1,5 @@
 -- SafePassage Schema Outline (PostgreSQL / Supabase)
--- Contract version: 1.0.0
+-- Contract version: 1.1.0
 -- NOTE: This is a blueprint for integration planning, not a production migration.
 
 -- =====================================
@@ -42,6 +42,7 @@ create table if not exists trips (
   title text not null,
   start_date date not null,
   end_date date not null,
+  destination_country text,
   heartbeat_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -230,6 +231,7 @@ create table if not exists incident_sync_jobs (
 -- Index Suggestions
 -- =====================================
 create index if not exists idx_trips_user_id on trips(user_id);
+create index if not exists idx_trips_destination_country on trips(destination_country);
 create index if not exists idx_itinerary_segments_trip_order on itinerary_segments(trip_id, segment_order);
 create index if not exists idx_heartbeats_user_time on heartbeats(user_id, timestamp desc);
 create index if not exists idx_traveler_status_trip_stage on traveler_status(trip_id, current_stage);

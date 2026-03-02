@@ -96,3 +96,33 @@ def has_recent_stage_alert(user_id: str, trip_id: str, stage: str, within_minute
         ).mappings().first()
 
     return bool(row)
+
+
+def has_stage_1_confirmation(user_id: str, trip_id: str, since: datetime | None = None) -> bool:
+    """Return whether emergency contact confirmed unreachability after stage-1."""
+    if not _is_uuid(user_id) or not _is_uuid(trip_id):
+        return False
+
+    query = text(
+        """
+        SELECT id
+        FROM alert_events
+        WHERE user_id = :user_id
+          AND trip_id = :trip_id
+          AND stage = 'stage_1_contact_confirmation'
+          AND (:since IS NULL OR created_at >= :since)
+        LIMIT 1
+        """
+    )
+
+    with get_db_engine().begin() as connection:
+        row = connection.execute(
+            query,
+            {
+                "user_id": user_id,
+                "trip_id": trip_id,
+                "since": since,
+            },
+        ).mappings().first()
+
+    return bool(row)

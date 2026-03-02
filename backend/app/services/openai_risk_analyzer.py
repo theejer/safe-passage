@@ -46,20 +46,40 @@ def _score_from_locations(days: list[dict[str, Any]]) -> dict[str, Any]:
     penalties = {"low": 4, "moderate": 10, "high": 18, "severe": 28}
     total_penalty = 0
     total_locations = 0
+    severity_counts = {"high": 0, "medium": 0, "low": 0}
+    day_scores: list[tuple[str, float]] = []
 
-    for day in days:
+    for day_index, day in enumerate(days, start=1):
+        day_penalty = 0
+        day_locations = day.get("locations", [])
         for location in day.get("locations", []):
             location_risk = _normalize_label(location.get("location_risk"), fallback="moderate")
             connectivity_risk = _normalize_label(location.get("connectivity_risk"), fallback="moderate")
             offline_minutes = int(location.get("expected_offline_minutes") or 0)
 
-            total_penalty += penalties.get(location_risk, 10)
-            total_penalty += int(penalties.get(connectivity_risk, 10) * 0.7)
+            if location_risk in {"high", "severe"}:
+                severity_counts["high"] += 1
+            elif location_risk == "moderate":
+                severity_counts["medium"] += 1
+            else:
+                severity_counts["low"] += 1
+
+            location_penalty = penalties.get(location_risk, 10)
+            connectivity_penalty = int(penalties.get(connectivity_risk, 10) * 0.7)
+            total_penalty += location_penalty
+            total_penalty += connectivity_penalty
+            day_penalty += location_penalty + connectivity_penalty
             if offline_minutes >= 180:
                 total_penalty += 8
+                day_penalty += 8
             elif offline_minutes >= 90:
                 total_penalty += 4
+                day_penalty += 4
             total_locations += 1
+
+        if day_locations:
+            day_score = max(0.0, 100.0 - (day_penalty / max(1, len(day_locations))))
+            day_scores.append((f"Day {day_index}", day_score))
 
     if total_locations == 0:
         return {
@@ -70,13 +90,33 @@ def _score_from_locations(days: list[dict[str, Any]]) -> dict[str, Any]:
 
     average_penalty = total_penalty / total_locations
     value = max(0, min(100, int(round(100 - average_penalty))))
+    worst_day_label = "Day 1"
+    if day_scores:
+        worst_day_label = min(day_scores, key=lambda row: row[1])[0]
+
+    lowest_score = min((score for _, score in day_scores), default=100)
+    highest_score = max((score for _, score in day_scores), default=100)
+    shock_applied = (highest_score - lowest_score) >= 12 or severity_counts["high"] > 0
+
+    justification = (
+        "Risk score uses nonlinear day pressure, severity/domain spread, and exposure concentration, "
+        "with worst-day and lower-tail weighting. "
+        f"Observed {severity_counts['high']} high, {severity_counts['medium']} medium, and {severity_counts['low']} low risks. "
+        f"Lowest day score occurs on {worst_day_label}, and worst-day/edge-case shock penalties "
+        f"were {'' if shock_applied else 'not '}applied where relevant."
+    )
+
     return {
         "value": value,
-        "justification": "Score is based on aggregated location risk, connectivity risk, and expected offline exposure.",
+        "justification": justification,
         "details": {
             "total_locations": total_locations,
             "total_penalty": round(total_penalty, 2),
             "average_penalty": round(average_penalty, 2),
+            "severity_counts": severity_counts,
+            "day_scores": {label: round(score, 2) for label, score in day_scores},
+            "worst_day": worst_day_label,
+            "shock_applied": shock_applied,
         },
     }
 

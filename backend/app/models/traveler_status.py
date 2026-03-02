@@ -177,3 +177,25 @@ def list_open_statuses() -> list[dict]:
         rows = connection.execute(query).mappings().all()
 
     return [dict(row) for row in rows]
+
+
+def list_open_stage_1_trip_ids_for_user(user_id: str) -> list[str]:
+    """Return open stage-1 trip ids for a user, newest stage-change first."""
+    if not _is_uuid(user_id):
+        return []
+
+    query = text(
+        """
+        SELECT trip_id
+        FROM traveler_status
+        WHERE user_id = :user_id
+          AND current_stage = 'stage_1_initial_alert'
+          AND monitoring_state <> 'resolved'
+        ORDER BY last_stage_change_at DESC NULLS LAST, updated_at DESC
+        """
+    )
+
+    with get_db_engine().begin() as connection:
+        rows = connection.execute(query, {"user_id": user_id}).mappings().all()
+
+    return [str(row.get("trip_id")) for row in rows if row.get("trip_id")]

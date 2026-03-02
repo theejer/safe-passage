@@ -230,3 +230,34 @@ def activate_telegram_contact_by_phone(phone: str, chat_id: str) -> dict:
         "telegram_chat_id": normalized_chat_id,
         "telegram_bot_active": True,
     }
+
+
+def get_emergency_contact_context_by_chat_id(chat_id: str) -> dict:
+    """Resolve emergency contact and traveler context for an activated Telegram chat id."""
+    normalized_chat_id = (chat_id or "").strip()
+    if not normalized_chat_id:
+        return {}
+
+    query = text(
+        """
+        SELECT
+            ec.id AS contact_id,
+            ec.user_id,
+            ec.name AS contact_name,
+            ec.phone AS contact_phone,
+            ec.telegram_chat_id,
+            ec.telegram_bot_active,
+            u.full_name AS traveler_name
+        FROM emergency_contacts ec
+        JOIN users u ON u.id = ec.user_id
+        WHERE ec.telegram_chat_id = :chat_id
+          AND ec.telegram_bot_active = TRUE
+        ORDER BY ec.created_at DESC
+        LIMIT 1
+        """
+    )
+
+    with get_db_engine().begin() as connection:
+        row = connection.execute(query, {"chat_id": normalized_chat_id}).mappings().first()
+
+    return dict(row) if row else {}

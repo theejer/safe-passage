@@ -12,6 +12,8 @@ export default function TripDashboardScreen() {
     <View style={{ flex: 1, padding: 16, gap: 10 }}>
       <Text style={{ fontSize: 20, fontWeight: "700" }}>{trip?.title ?? "Trip"}</Text>
       <RiskSummary tripId={String(tripId)} />
+      <Link href="/dashboard">Back to Dashboard</Link>
+      <Link href={`/trips/${tripId}/start`}>Start Trip</Link>
       <Link href={`/trips/${tripId}/itinerary`}>Edit Itinerary</Link>
       <Link href={`/trips/${tripId}/import`}>Import Itinerary File</Link>
       <Link href={`/trips/${tripId}/risk`}>View Full Risk</Link>
