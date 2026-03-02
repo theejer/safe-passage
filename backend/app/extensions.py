@@ -28,12 +28,11 @@ def init_extensions(app: Flask) -> None:
 
     logging.basicConfig(level=logging.INFO)
 
-    url = app.config.get("SUPABASE_URL", "").strip()
-    key = app.config.get("SUPABASE_KEY", "").strip()
+    url = app.config.get("SUPABASE_URL")
     
     if url and key and not url.startswith("https://your-"):
         try:
-            supabase_client = create_client(url, key)
+            supabase_client = create_client(url)
         except Exception as e:
             app.logger.warning(f"Supabase initialization failed: {e}. Continuing in degraded mode.")
     else:

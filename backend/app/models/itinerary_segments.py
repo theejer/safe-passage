@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
-from app.extensions import get_supabase
+from sqlalchemy import text
+
+from app.extensions import get_db_engine
 
 
 def list_segments_for_trip(trip_id: str) -> list[dict]:
     """List trip segments with expected offline windows."""
-    response = (
-        get_supabase()
-        .table("itinerary_segments")
-        .select("*")
-        .eq("trip_id", trip_id)
-        .order("segment_order")
-        .execute()
+    query = text(
+        """
+        SELECT *
+        FROM itinerary_segments
+        WHERE trip_id = :trip_id
+        ORDER BY segment_order ASC
+        """
     )
-    return response.data or []
+
+    with get_db_engine().begin() as connection:
+        rows = connection.execute(query, {"trip_id": trip_id}).mappings().all()
+
+    return [dict(row) for row in rows]

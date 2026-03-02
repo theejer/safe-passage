@@ -13,7 +13,8 @@ export function useUserProfile() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  async function saveProfile() {
+  async function saveProfile(options?: { requireRemote?: boolean }) {
+    const requireRemote = options?.requireRemote ?? false;
     setIsSaving(true);
     setError(null);
     setSuccess(false);
@@ -22,6 +23,11 @@ export function useUserProfile() {
       const normalizedPhone = profile.phone.trim();
 
       if (!normalizedFullName || normalizedPhone.length < 8) {
+        if (requireRemote) {
+          setSaveError("Enter a valid full name and phone before saving.");
+          throw new Error("invalid_profile_fields");
+        }
+
         const fallbackUser: UserProfile = {
           ...profile,
           id: profile.id ?? `local_user_${Date.now()}`,
@@ -37,6 +43,10 @@ export function useUserProfile() {
 
       try {
         const created = (await createUser(profile)) as UserProfile | null;
+        if (requireRemote && !created?.id) {
+          setSaveError("Server save did not return a user id. Please try again.");
+          throw new Error("remote_save_missing_user_id");
+        }
         const emergencyName = profile.emergencyContact?.name?.trim() ?? "";
         const emergencyPhone = profile.emergencyContact?.phone?.trim() ?? "";
 
@@ -46,7 +56,11 @@ export function useUserProfile() {
         if (created?.id) {
           resolvedUser = { ...profile, id: created.id };
         }
-      } catch {
+      } catch (error) {
+        if (requireRemote) {
+          setSaveError("Could not save to server. Please ensure backend is running and try again.");
+          throw error;
+        }
         resolvedUser = { ...profile, id: profile.id ?? `local_user_${Date.now()}` };
       }
 

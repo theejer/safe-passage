@@ -8,7 +8,6 @@ Covers:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from app import create_app
@@ -16,63 +15,55 @@ from app.models.heartbeats import insert_heartbeat
 from app.services import heartbeat_monitor
 
 
-@dataclass
-class _Result:
-    data: list[dict]
+class _FakeResult:
+    def __init__(self, rows: list[dict]):
+        self._rows = rows
+
+    def mappings(self):
+        return self
+
+    def first(self):
+        return self._rows[0] if self._rows else None
+
+    def all(self):
+        return self._rows
 
 
-class _FakeTable:
-    def __init__(self, db: dict[str, list[dict]], name: str):
+class _FakeConnection:
+    def __init__(self, db: dict[str, list[dict]]):
         self._db = db
-        self._name = name
-        self._rows = list(db.get(name, []))
-        self._insert_payload: dict | None = None
-        self._limit: int | None = None
-
-    def insert(self, payload: dict):
-        self._insert_payload = payload
-        return self
-
-    def select(self, _fields: str):
-        return self
-
-    def eq(self, field: str, value):
-        self._rows = [row for row in self._rows if row.get(field) == value]
-        return self
-
-    def order(self, _field: str, desc: bool = False):
-        self._rows = sorted(self._rows, key=lambda row: row.get(_field), reverse=desc)
-        return self
-
-    def limit(self, value: int):
-        self._limit = value
-        return self
-
-    def execute(self):
-        if self._insert_payload is not None:
-            payload = dict(self._insert_payload)
-            if self._name == "heartbeats":
-                user_exists = any(item.get("id") == payload.get("user_id") for item in self._db["users"])
-                trip_exists = any(item.get("id") == payload.get("trip_id") for item in self._db["trips"])
-                if not user_exists:
-                    raise ValueError("foreign key violation: users")
-                if not trip_exists:
-                    raise ValueError("foreign key violation: trips")
-            self._db[self._name].append(payload)
-            return _Result([payload])
-
-        rows = self._rows
-        if self._limit is not None:
-            rows = rows[: self._limit]
-        return _Result(rows)
+    def execute(self, query, params: dict):
+        sql = str(query)
+        if "INSERT INTO heartbeats" in sql:
+            payload = dict(params)
+            user_exists = any(item.get("id") == payload.get("user_id") for item in self._db["users"])
+            trip_exists = any(item.get("id") == payload.get("trip_id") for item in self._db["trips"])
+            if not user_exists:
+                raise ValueError("foreign key violation: users")
+            if not trip_exists:
+                raise ValueError("foreign key violation: trips")
+            self._db["heartbeats"].append(payload)
+            return _FakeResult([payload])
+        return _FakeResult([])
 
 
-class _FakeSupabase:
+class _FakeEngineContext:
     def __init__(self, db: dict[str, list[dict]]):
         self._db = db
 
-    def table(self, name: str):
-        return _FakeTable(self._db, name)
+    def __enter__(self):
+        return _FakeConnection(self._db)
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeEngine:
+    def __init__(self, db: dict[str, list[dict]]):
+        self._db = db
+
+    def begin(self):
+        return _FakeEngineContext(self._db)
 
 
 def test_insert_heartbeat_with_fk_seed_data(monkeypatch):
@@ -83,7 +74,7 @@ def test_insert_heartbeat_with_fk_seed_data(monkeypatch):
         "heartbeats": [],
     }
 
-    monkeypatch.setattr("app.models.heartbeats.get_supabase", lambda: _FakeSupabase(fake_db))
+    monkeypatch.setattr("app.models.heartbeats.get_db_engine", lambda: _FakeEngine(fake_db))
 
     created = insert_heartbeat(
         {
