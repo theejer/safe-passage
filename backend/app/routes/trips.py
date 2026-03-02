@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
 from app.models.itineraries import get_itinerary, upsert_itinerary
-from app.models.trips import create_trip, get_trip_by_id, list_trips_by_user
+from app.models.trips import create_trip, list_trips_by_user
 from app.schemas.itinerary_schema import ItinerarySchema
 from app.schemas.trip_schema import TripCreateSchema
 from app.services.pdf_parser import extract_itinerary_from_document, extract_itinerary_from_text
@@ -111,25 +111,6 @@ def _normalize_itinerary_payload(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_parser_context(*, trip_id: str | None, payload: dict[str, Any]) -> dict[str, Any]:
-    context: dict[str, Any] = {
-        "trip_name": _as_text(payload.get("trip_name")) or _as_text(payload.get("title")),
-        "start_date": _as_text(payload.get("start_date")),
-        "end_date": _as_text(payload.get("end_date")),
-        "destination_country": _as_text(payload.get("destination_country")),
-    }
-
-    resolved_trip_id = _as_text(trip_id)
-    if resolved_trip_id:
-        trip = get_trip_by_id(resolved_trip_id)
-        if isinstance(trip, dict):
-            context["trip_name"] = context["trip_name"] or _as_text(trip.get("title"))
-            context["start_date"] = context["start_date"] or _as_text(trip.get("start_date"))
-            context["end_date"] = context["end_date"] or _as_text(trip.get("end_date"))
-
-    return context
-
-
 @trips_bp.post("")
 def create_trip_route():
     """Create trip shell before itinerary analysis and monitoring begin."""
@@ -221,19 +202,9 @@ def upload_pdf_route():
             temp_path = tmp_file.name
         
         try:
-            parser_context = _build_parser_context(
-                trip_id=trip_id,
-                payload={
-                    "trip_name": request.form.get("trip_name"),
-                    "start_date": request.form.get("start_date"),
-                    "end_date": request.form.get("end_date"),
-                    "destination_country": request.form.get("destination_country"),
-                },
-            )
-
             # Extract itinerary from PDF
             logger.debug(f"Extracting itinerary from uploaded document for trip {trip_id}")
-            itinerary = extract_itinerary_from_document(temp_path, parser_context=parser_context)
+            itinerary = extract_itinerary_from_document(temp_path)
             itinerary = _normalize_itinerary_payload(itinerary)
             itinerary = ItinerarySchema.model_validate(itinerary).model_dump()
             logger.debug("[ItineraryParser] Normalized upload output: %s", itinerary)
@@ -281,8 +252,7 @@ def parse_text_route():
         if not itinerary_text:
             return jsonify({"error": "itinerary_text is required"}), 400
 
-        parser_context = _build_parser_context(trip_id=trip_id, payload=payload)
-        itinerary = extract_itinerary_from_text(itinerary_text, parser_context=parser_context)
+        itinerary = extract_itinerary_from_text(itinerary_text)
         itinerary = _normalize_itinerary_payload(itinerary)
         itinerary = ItinerarySchema.model_validate(itinerary).model_dump()
         logger.debug("[ItineraryParser] Normalized text output: %s", itinerary)

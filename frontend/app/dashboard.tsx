@@ -4,6 +4,7 @@ import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTrips } from "@/features/trips/hooks/useTrips";
 import { getItem } from "@/features/storage/services/localStore";
+import { Button } from "@/shared/components/Button";
 import { useRiskReport } from "@/features/risk/hooks/useRiskReport";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { getLatestItinerary } from "@/features/trips/services/itineraryApi";
@@ -109,12 +110,7 @@ export default function DashboardScreen() {
       <Text style={{ fontSize: 24, fontWeight: "700" }}>Dashboard</Text>
       <Text style={{ color: "#4b5563" }}>Manage your trips, view saved trips, and start a trip.</Text>
 
-      <TouchableOpacity
-        style={{ backgroundColor: "#1976d2", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: "center" }}
-        onPress={() => router.push("/trips")}
-      >
-        <Text style={{ color: "white", fontWeight: "600", fontSize: 16 }}>Create New Trip</Text>
-      </TouchableOpacity>
+      <Button onPress={() => router.push("/trips")}>Create New Trip</Button>
 
       <View style={{ borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, padding: 12, gap: 8, backgroundColor: "white" }}>
         <Text style={{ fontSize: 18, fontWeight: "700" }}>Saved Trips</Text>

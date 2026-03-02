@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from "react-native";
+import { useState } from "react";
+import { View, Text, ActivityIndicator, Platform, ScrollView } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadItineraryPDF } from "@/features/trips/services/itineraryApi";
-import { getTripById } from "@/features/storage/services/offlineDb";
 import { Day } from "../types";
+import { Button } from "@/shared/components/Button";
 
 type ItineraryUploadProps = {
   tripId: string;
@@ -14,28 +14,6 @@ type ItineraryUploadProps = {
 export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: ItineraryUploadProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [tripMeta, setTripMeta] = useState<{ title?: string; startDate?: string; endDate?: string } | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const trip = await getTripById(tripId);
-        if (!mounted || !trip) return;
-        setTripMeta({
-          title: trip.title,
-          startDate: trip.startDate,
-          endDate: trip.endDate,
-        });
-      } catch {
-        if (mounted) setTripMeta(null);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [tripId]);
 
   async function pickPDF() {
     try {
@@ -64,9 +42,6 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
       // Create FormData and upload
       const formData = new FormData();
       formData.append("trip_id", tripId);
-      if (tripMeta?.title) formData.append("trip_name", tripMeta.title);
-      if (tripMeta?.startDate) formData.append("start_date", tripMeta.startDate);
-      if (tripMeta?.endDate) formData.append("end_date", tripMeta.endDate);
 
       if (Platform.OS === "web") {
         const webFile = (file as any).file as File | undefined;
@@ -126,34 +101,10 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
 
       {!loading && (
         <>
-          <TouchableOpacity
-            style={{
-              backgroundColor: "#1976d2",
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
-              width: "100%",
-              alignItems: "center",
-            }}
-            onPress={pickPDF}
-          >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Choose File</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: "#999",
-              width: "100%",
-              alignItems: "center",
-            }}
-            onPress={onCancel}
-          >
-            <Text style={{ color: "#333", fontSize: 16, fontWeight: "600" }}>Cancel</Text>
-          </TouchableOpacity>
+          <Button onPress={() => void pickPDF()}>Choose File</Button>
+          <Button variant="outline" onPress={onCancel}>
+            Cancel
+          </Button>
         </>
       )}
     </ScrollView>
