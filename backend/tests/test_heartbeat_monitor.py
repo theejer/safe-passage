@@ -195,12 +195,13 @@ def test_watchdog_timer_and_emergency_alert_for_enabled_trip(monkeypatch):
     )
     monkeypatch.setattr(
         heartbeat_monitor,
-        "list_segments_for_trip",
+        "list_expected_offline_windows_for_trip",
         lambda _trip_id: [
             {"segment_order": 1, "expected_offline_minutes": 90, "connectivity_risk": "severe"}
         ],
     )
     monkeypatch.setattr(heartbeat_monitor, "has_stage_1_confirmation", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(heartbeat_monitor, "is_stage_1_rearmed", lambda *_args, **_kwargs: (True, "ok"))
     monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(
         heartbeat_monitor,
@@ -290,6 +291,7 @@ def test_watchdog_bootstraps_missing_status_with_stage_1_alert(monkeypatch):
         ],
     )
     monkeypatch.setattr(heartbeat_monitor, "list_open_statuses", lambda: [])
+    monkeypatch.setattr(heartbeat_monitor, "is_stage_1_rearmed", lambda *_args, **_kwargs: (True, "ok"))
     monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(
         heartbeat_monitor,
@@ -347,6 +349,79 @@ def test_watchdog_bootstraps_missing_status_with_stage_1_alert(monkeypatch):
     assert "2026-03-01 to 2026-03-05" in sent_telegram[0][1]
     assert len(upserted_statuses) == 1
     assert upserted_statuses[0]["current_stage"] == heartbeat_monitor.STAGE_1
+
+
+def test_stage1_suppressed_when_not_rearmed(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    last_seen = now - timedelta(minutes=140)
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_by_id",
+        lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "derive_monitoring_expectation",
+        lambda _status, _trip_id, _now: {
+            "expected_offline_minutes": 90,
+            "threshold_multiplier": 1.5,
+        },
+    )
+    monkeypatch.setattr(heartbeat_monitor, "is_stage_1_rearmed", lambda *_args, **_kwargs: (False, "blocked-by-stage_2_escalation"))
+
+    status = {
+        "id": "sts_1",
+        "user_id": "usr_1",
+        "trip_id": "trp_1",
+        "last_seen_at": last_seen.isoformat().replace("+00:00", "Z"),
+        "current_stage": "none",
+        "monitoring_state": "active",
+    }
+
+    result = heartbeat_monitor.evaluate_status_for_alert(status, now)
+
+    assert result["status"] == "stage-1-suppressed"
+    assert result["reason"] == "blocked-by-stage_2_escalation"
+    assert result["offline_duration_minutes"] == 140
+
+
+def test_bootstrap_stage1_suppressed_when_not_rearmed(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+
+    sent_telegram: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "list_active_heartbeat_trips",
+        lambda _today: [
+            {
+                "id": "trp_1",
+                "user_id": "usr_1",
+                "title": "Bihar Route",
+                "country": "India",
+                "heartbeat_enabled": True,
+                "start_date": "2026-03-01",
+                "end_date": "2026-03-05",
+            }
+        ],
+    )
+    monkeypatch.setattr(heartbeat_monitor, "list_open_statuses", lambda: [])
+    monkeypatch.setattr(heartbeat_monitor, "is_stage_1_rearmed", lambda *_args, **_kwargs: (False, "blocked-by-stage_1_initial_alert"))
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda chat_id, message, bot_token=None: sent_telegram.append((chat_id, message)) or {"queued": True},
+    )
+
+    result = heartbeat_monitor.run_watchdog_cycle(now_utc=now)
+
+    assert result["active_trip_count"] == 1
+    assert result["alerts_created_count"] == 0
+    row = result["results"][0]
+    assert row["status"] == "stage-1-suppressed"
+    assert row["reason"] == "blocked-by-stage_1_initial_alert"
+    assert len(sent_telegram) == 0
 
 
 def test_stage1_message_expands_iso2_destination_country(monkeypatch):
@@ -993,6 +1068,118 @@ def test_derive_monitoring_expectation_blends_connectivity_history_and_persists(
     assert 1.2 <= result["threshold_multiplier"] <= 2.0
     assert persisted_payload["trip_id"] == "trp_1"
     assert "location_name" in persisted_payload
+
+
+def test_stage1_does_not_trigger_below_1_5x_expected(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    last_seen = now - timedelta(minutes=100)
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_by_id",
+        lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "derive_monitoring_expectation",
+        lambda _status, _trip_id, _now: {
+            "expected_offline_minutes": 90,
+            "threshold_multiplier": 1.5,
+        },
+    )
+
+    status = {
+        "id": "sts_1",
+        "user_id": "usr_1",
+        "trip_id": "trp_1",
+        "last_seen_at": last_seen.isoformat().replace("+00:00", "Z"),
+        "current_stage": "none",
+        "monitoring_state": "active",
+    }
+
+    result = heartbeat_monitor.evaluate_status_for_alert(status, now)
+
+    assert result["status"] == "within-window"
+    assert result["offline_duration_minutes"] == 100
+    assert result["expected_offline_minutes"] == 90
+
+
+def test_stage1_triggers_when_over_1_5x_expected(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    last_seen = now - timedelta(minutes=140)
+
+    sent_telegram: list[tuple[str, str]] = []
+    created_alerts: list[dict] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_by_id",
+        lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "derive_monitoring_expectation",
+        lambda _status, _trip_id, _now: {
+            "expected_offline_minutes": 90,
+            "threshold_multiplier": 1.5,
+        },
+    )
+    monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_user_by_id",
+        lambda _user_id: {
+            "id": "usr_1",
+            "full_name": "Aarti",
+            "emergency_contact": {
+                "name": "Ravi",
+                "phone": "+919100000001",
+                "telegram_chat_id": "123456",
+                "telegram_bot_active": True,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda chat_id, message, bot_token=None: sent_telegram.append((chat_id, message)) or {"queued": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "create_alert_event",
+        lambda payload: created_alerts.append(payload) or payload,
+    )
+    monkeypatch.setattr(heartbeat_monitor, "update_status", lambda *_args, **_kwargs: {"ok": True})
+
+    status = {
+        "id": "sts_1",
+        "user_id": "usr_1",
+        "trip_id": "trp_1",
+        "last_seen_at": last_seen.isoformat().replace("+00:00", "Z"),
+        "current_stage": "none",
+        "monitoring_state": "active",
+    }
+
+    result = heartbeat_monitor.evaluate_status_for_alert(status, now)
+
+    assert result["status"] == "alerted"
+    assert result["trigger_stage"] == heartbeat_monitor.STAGE_1
+    assert result["offline_duration_minutes"] == 140
+    assert result["expected_offline_minutes"] == 90
+    assert len(created_alerts) == 1
+    assert len(sent_telegram) == 1
+
+
+def test_derive_expected_offline_minutes_falls_back_when_segments_query_fails(monkeypatch):
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "list_expected_offline_windows_for_trip",
+        lambda _trip_id: (_ for _ in ()).throw(RuntimeError("relation itinerary_risks does not exist")),
+    )
+
+    result = heartbeat_monitor.derive_expected_offline_minutes("trp_1")
+
+    assert result == 90
 
 
 def test_monitoring_expectation_calculation_demo_prints(monkeypatch):

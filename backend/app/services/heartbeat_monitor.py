@@ -14,14 +14,20 @@ from uuid import uuid4
 
 from flask import current_app, has_app_context
 
-from app.models.alerts import create_alert_event, has_recent_stage_alert, has_stage_1_confirmation
+from app.models.alerts import (
+    create_alert_event,
+    has_recent_stage_alert,
+    has_stage_1_confirmation,
+    is_stage_1_rearmed,
+)
 from app.models.heartbeats import list_recent_heartbeats
-from app.models.itinerary_segments import list_segments_for_trip
+from app.models.itinerary_risks import list_expected_offline_windows_for_trip
 from app.models.itineraries import get_itinerary
 from app.models.monitoring_expectations import get_latest_monitoring_expectation, upsert_monitoring_expectation
 from app.models.traveler_status import get_status_for_trip, list_open_statuses, update_status, upsert_status
 from app.models.trips import get_trip_alert_context, get_trip_by_id, list_active_heartbeat_trips
 from app.models.users import get_user_by_id
+from app.services.connectivity_model import should_trigger_alert
 from app.services.connectivity_predictor import predict_connectivity_for_latlon
 from app.services.notifications import send_telegram_alert
 
@@ -135,18 +141,26 @@ def _risk_multiplier(connectivity_risk: str, battery_percent: int | None, event_
 
 
 def derive_expected_offline_minutes(trip_id: str) -> int:
-    """Resolve expected offline window from itinerary segments.
+    """Resolve expected offline window from itinerary risk windows.
 
     Falls back to conservative defaults when no segment exists.
     """
-    segments = list_segments_for_trip(trip_id)
-    if not segments:
+    try:
+        risk_windows = list_expected_offline_windows_for_trip(trip_id)
+    except Exception as exc:
+        logger.warning(
+            "[watchdog] risk_windows_lookup_failed trip_id=%s error=%s; using default expected offline window",
+            trip_id,
+            exc,
+        )
+        return 90
+    if not risk_windows:
         return 90
 
     candidate_windows = [
-        int(segment.get("expected_offline_minutes", 0))
-        for segment in segments
-        if segment.get("expected_offline_minutes") is not None
+        int(window.get("expected_offline_minutes", 0))
+        for window in risk_windows
+        if window.get("expected_offline_minutes") is not None
     ]
     candidate_windows = [value for value in candidate_windows if value > 0]
     if not candidate_windows:
@@ -531,6 +545,15 @@ def _bootstrap_missing_status_with_stage_1(trip: dict, now_utc: datetime) -> dic
     if not trip_id or not user_id:
         return {"trip_id": trip_id, "status": "skipped-missing-keys"}
 
+    stage_1_allowed, stage_1_reason = is_stage_1_rearmed(user_id, trip_id, buffer_minutes=30)
+    if not stage_1_allowed:
+        return {
+            "trip_id": trip_id,
+            "status": "stage-1-suppressed",
+            "trigger_stage": "none",
+            "reason": stage_1_reason,
+        }
+
     if has_recent_stage_alert(user_id, trip_id, STAGE_1, within_minutes=30):
         return {
             "trip_id": trip_id,
@@ -888,12 +911,31 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
 
     if not force_stage_1_test_mode:
         expectation = derive_monitoring_expectation(status, trip_id, now_utc)
-        expected = int(expectation.get("expected_offline_minutes", derive_expected_offline_minutes(trip_id)))
-        threshold_multiplier = float(expectation.get("threshold_multiplier", 1.5))
-        multiplier = _risk_multiplier(connectivity_risk, battery_percent, now_utc)
-        adjusted_expected = max(15, int(expected * multiplier))
-        stage_1_threshold = max(15, int(adjusted_expected * threshold_multiplier))
+        expected_value = expectation.get("expected_offline_minutes")
+        if expected_value is None:
+            expected_value = derive_expected_offline_minutes(trip_id)
+        expected = int(expected_value)
+        adjusted_expected = max(15, expected)
+        stage_1_threshold = max(15, int(adjusted_expected * 1.5))
         stage_2_threshold = max(int(stage_1_threshold * 1.8), stage_1_threshold + 30)
+
+        ratio = (offline_duration_minutes / adjusted_expected) if adjusted_expected > 0 else 0.0
+        if offline_duration_minutes < adjusted_expected:
+            logger.info(
+                "[watchdog] trip=%s %s minutes below expected connectivity (offline=%s expected=%s)",
+                trip_id,
+                adjusted_expected - offline_duration_minutes,
+                offline_duration_minutes,
+                adjusted_expected,
+            )
+        elif not should_trigger_alert(offline_duration_minutes, adjusted_expected):
+            logger.info(
+                "[watchdog] trip=%s danger: exceeded expected connectivity by %.1f times (offline=%s expected=%s)",
+                trip_id,
+                ratio,
+                offline_duration_minutes,
+                adjusted_expected,
+            )
 
     current_stage = status.get("current_stage", "none")
     trigger_stage = "none"
@@ -901,8 +943,19 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
         trigger_stage = STAGE_1
     else:
         if current_stage in {"none", ""}:
-            if offline_duration_minutes >= stage_1_threshold:
-                trigger_stage = STAGE_1
+            if should_trigger_alert(offline_duration_minutes, adjusted_expected):
+                stage_1_allowed, stage_1_reason = is_stage_1_rearmed(user_id, trip_id, buffer_minutes=30)
+                if stage_1_allowed:
+                    trigger_stage = STAGE_1
+                else:
+                    return {
+                        "trip_id": trip_id,
+                        "status": "stage-1-suppressed",
+                        "current_stage": current_stage,
+                        "offline_duration_minutes": offline_duration_minutes,
+                        "expected_offline_minutes": adjusted_expected,
+                        "reason": stage_1_reason,
+                    }
         elif current_stage == STAGE_1 and offline_duration_minutes >= stage_2_threshold:
             since = None
             last_stage_change_at = status.get("last_stage_change_at")
@@ -972,6 +1025,15 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
         recipients=recipients,
         escalation_context=escalation_context,
     )
+
+    if trigger_stage == STAGE_1:
+        logger.warning(
+            "[watchdog] stage_1 alert sent: offline=%s expected=%s ratio=%.2f trip_id=%s",
+            offline_duration_minutes,
+            adjusted_expected,
+            (offline_duration_minutes / adjusted_expected) if adjusted_expected > 0 else 0.0,
+            trip_id,
+        )
 
     update_status(
         user_id,

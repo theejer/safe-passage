@@ -200,6 +200,23 @@ def list_active_heartbeat_trips(today_iso_date: str) -> list[dict]:
         FROM trips
         WHERE heartbeat_enabled = TRUE
           AND trip_planned = TRUE
+          AND (
+                (start_date <= :today_iso_date AND end_date >= :today_iso_date)
+                OR EXISTS (
+                    SELECT 1
+                    FROM traveler_status ts
+                    WHERE ts.trip_id = trips.id
+                      AND ts.monitoring_state <> 'resolved'
+                )
+          )
+        """
+    )
+    query_with_flags_no_status = text(
+        """
+        SELECT *
+        FROM trips
+        WHERE heartbeat_enabled = TRUE
+          AND trip_planned = TRUE
           AND start_date <= :today_iso_date
           AND end_date >= :today_iso_date
         """
@@ -228,6 +245,8 @@ def list_active_heartbeat_trips(today_iso_date: str) -> list[dict]:
             if _is_missing_table_error(exc, "trips"):
                 _ensure_trips_table_for_sqlite()
                 result = connection.execute(query_without_heartbeat, {"today_iso_date": today_iso_date})
+            elif _is_missing_table_error(exc, "traveler_status"):
+                result = connection.execute(query_with_flags_no_status, {"today_iso_date": today_iso_date})
             elif _is_missing_column_error(exc, "trip_planned"):
                 result = connection.execute(query_with_heartbeat, {"today_iso_date": today_iso_date})
             elif not _is_missing_column_error(exc, "heartbeat_enabled"):

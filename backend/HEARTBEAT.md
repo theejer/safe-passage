@@ -38,7 +38,7 @@ Service: `app/services/heartbeat_monitor.py`
 - `run_watchdog_cycle()` loads active heartbeat-enabled trips for today.
 - Evaluates each status with `evaluate_status_for_alert()`.
 - Threshold model:
-  - expected offline window from itinerary segments (`derive_expected_offline_minutes`, fallback 90 min)
+  - expected offline window from itinerary risk windows + connectivity predictor (`derive_expected_offline_minutes`, fallback 90 min)
   - multiplied by risk and context (`_risk_multiplier`) using connectivity risk, battery, time-of-day, weekend.
 - Stage transitions:
   - `stage_1_initial_alert` when offline exceeds adjusted expected window
@@ -63,7 +63,7 @@ Service: `app/services/heartbeat_monitor.py`
 - `app/models/trips.py`: heartbeat opt-in via `heartbeat_enabled`; active-trip selection.
 - `app/models/traveler_status.py`: status upsert/update used by ingest and watchdog.
 - `app/models/alerts.py`: escalation event persistence and dedupe checks.
-- `app/models/itinerary_segments.py`: expected offline windows.
+- `app/models/itinerary_risks.py`: expected offline windows from risk analysis.
 - `app/services/notifications.py`: SMS dispatch.
 
 ### Integrating heartbeat into new backend features
@@ -149,4 +149,4 @@ curl -X POST http://localhost:5000/heartbeats/watchdog/run \
 
 - If scheduler is disabled, ingest still works and stage-3 recovery can still occur on new heartbeats.
 - Ensure alert channel credentials are configured (for SMS) in environments where escalation should notify real contacts.
-- For low-connectivity regions, keep itinerary segment `expected_offline_minutes` realistic to reduce false positives.
+- For low-connectivity regions, keep itinerary risk `expected_offline_minutes` realistic to reduce false positives.
