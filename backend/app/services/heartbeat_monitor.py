@@ -16,6 +16,7 @@ from flask import current_app, has_app_context
 
 from app.models.alerts import (
     create_alert_event,
+    get_latest_trip_stage_alert,
     has_recent_stage_alert,
     has_stage_1_confirmation,
     is_stage_1_rearmed,
@@ -35,6 +36,7 @@ STAGE_1 = "stage_1_initial_alert"
 STAGE_2 = "stage_2_escalation"
 STAGE_3 = "stage_3_auto_reconnection"
 STAGE_1_CONTACT_CONFIRMATION = "stage_1_contact_confirmation"
+STAGE_1_REARM_BUFFER_MINUTES = 30
 
 logger = logging.getLogger("watchdog")
 
@@ -54,6 +56,23 @@ _ISO2_COUNTRY_NAMES = {
     "AU": "Australia",
     "CA": "Canada",
     "AE": "United Arab Emirates",
+}
+
+_BIHAR_INDIA_EMERGENCY_CONTACTS = {
+    "national_emergency": "112",
+    "police": "100",
+    "ambulance": "108",
+    "fire": "101",
+    "women_helpline": "181",
+}
+
+_SINGAPORE_EMBASSY_CONTACTS = {
+    "india": {
+        "mission": "High Commission of the Republic of Singapore in New Delhi",
+        "phone": "+91-11-4600-0800",
+        "after_hours": "+91-98102-29013",
+        "address": "E-6 Chandragupta Marg, Chanakyapuri, New Delhi 110021",
+    }
 }
 
 
@@ -538,6 +557,104 @@ def _build_stage_1_message(
     )
 
 
+def _format_last_seen(status: dict) -> str:
+    raw = status.get("last_seen_at")
+    if not raw:
+        return "No heartbeat received yet"
+    try:
+        return _parse_iso(raw).isoformat()
+    except Exception:
+        return str(raw)
+
+
+def _format_last_known_location(status: dict) -> str:
+    lat = status.get("last_seen_lat")
+    lng = status.get("last_seen_lng")
+    if lat is None or lng is None:
+        return "No GPS fix recorded yet"
+    return f"{lat}, {lng}"
+
+
+def _format_local_emergency_contacts(alert_context: dict) -> str:
+    destination_country = str(alert_context.get("destination_country") or "").strip().lower()
+    if destination_country in {"india", "in", "bihar, india", "bihar"}:
+        return (
+            "LOCAL EMERGENCY CONTACTS (Bihar, India)\n"
+            f"- National Emergency: { _BIHAR_INDIA_EMERGENCY_CONTACTS['national_emergency'] }\n"
+            f"- Police: { _BIHAR_INDIA_EMERGENCY_CONTACTS['police'] }\n"
+            f"- Ambulance: { _BIHAR_INDIA_EMERGENCY_CONTACTS['ambulance'] }\n"
+            f"- Fire: { _BIHAR_INDIA_EMERGENCY_CONTACTS['fire'] }\n"
+            f"- Women Helpline: { _BIHAR_INDIA_EMERGENCY_CONTACTS['women_helpline'] }"
+        )
+    return "LOCAL EMERGENCY CONTACTS\n- Call national emergency services for the destination country immediately."
+
+
+def _format_singapore_embassy_contacts(alert_context: dict) -> str:
+    destination_country = str(alert_context.get("destination_country") or "").strip().lower()
+    if destination_country in {"india", "in", "bihar, india", "bihar"}:
+        embassy = _SINGAPORE_EMBASSY_CONTACTS["india"]
+        return (
+            "SINGAPORE EMBASSY / CONSULAR SUPPORT\n"
+            f"- Mission: {embassy['mission']}\n"
+            f"- Main Line: {embassy['phone']}\n"
+            f"- After-hours Emergency: {embassy['after_hours']}\n"
+            f"- Address: {embassy['address']}"
+        )
+    return "SINGAPORE EMBASSY / CONSULAR SUPPORT\n- Contact MFA Singapore duty office for destination-specific support."
+
+
+def _build_stage_2_message(alert_context: dict, status: dict, offline_duration_minutes: int, adjusted_expected: int) -> str:
+    traveler_name = alert_context.get("traveler_name") or "the traveler"
+    trip_window = _format_trip_window(alert_context)
+    last_seen = _format_last_seen(status)
+    last_known_location = _format_last_known_location(status)
+    battery = status.get("last_battery_percent")
+    battery_display = f"{battery}%" if battery is not None else "No battery telemetry received yet"
+    network = status.get("last_network_status") or "No network telemetry received yet"
+    location_risk = status.get("location_risk") or "Not assessed yet"
+    connectivity_risk = status.get("connectivity_risk") or "Not assessed yet"
+
+    return (
+        "🚨 URGENT STAGE 2 ESCALATION\n"
+        f"Traveler: {traveler_name}\n"
+        f"Trip Window: {trip_window}\n"
+        f"Offline Duration: ~{offline_duration_minutes} minutes\n"
+        f"Expected Reconnect Window: {adjusted_expected} minutes\n"
+        "\n"
+        "LAST KNOWN STATUS\n"
+        f"- Last Heartbeat: {last_seen}\n"
+        f"- Last Known Location: {last_known_location}\n"
+        f"- Battery: {battery_display}\n"
+        f"- Network: {network}\n"
+        f"- Location Risk: {location_risk}\n"
+        f"- Connectivity Risk: {connectivity_risk}\n"
+        "\n"
+        f"{_format_local_emergency_contacts(alert_context)}\n"
+        "\n"
+        f"{_format_singapore_embassy_contacts(alert_context)}"
+    )
+
+
+def _build_stage_3_heartbeat_recovery_message(alert_context: dict, status: dict, detected_at_iso: str) -> str:
+    traveler_name = alert_context.get("traveler_name") or "the traveler"
+    trip_window = _format_trip_window(alert_context)
+    last_known_location = _format_last_known_location(status)
+    return (
+        f"SafePassage update: {traveler_name} is back online ({trip_window}). "
+        f"Heartbeat detected at {detected_at_iso}. Last known location: {last_known_location}."
+    )
+
+
+def _build_stage_3_yes_recovery_message(alert_context: dict, confirmed_by: str) -> str:
+    traveler_name = alert_context.get("traveler_name") or "the traveler"
+    trip_window = _format_trip_window(alert_context)
+    return (
+        f"Thank you {confirmed_by}. You confirmed {traveler_name} is reachable ({trip_window}). "
+        f"SafePassage has resolved this alert to Stage 3 recovery and activated a "
+        f"{STAGE_1_REARM_BUFFER_MINUTES}-minute safety buffer before any new Stage 1 alert."
+    )
+
+
 def _bootstrap_missing_status_with_stage_1(trip: dict, now_utc: datetime) -> dict:
     """Create stage-1 alert when active heartbeat trip has no traveler_status row."""
     trip_id = str(trip.get("id") or "")
@@ -545,7 +662,11 @@ def _bootstrap_missing_status_with_stage_1(trip: dict, now_utc: datetime) -> dic
     if not trip_id or not user_id:
         return {"trip_id": trip_id, "status": "skipped-missing-keys"}
 
-    stage_1_allowed, stage_1_reason = is_stage_1_rearmed(user_id, trip_id, buffer_minutes=30)
+    stage_1_allowed, stage_1_reason = is_stage_1_rearmed(
+        user_id,
+        trip_id,
+        buffer_minutes=STAGE_1_REARM_BUFFER_MINUTES,
+    )
     if not stage_1_allowed:
         return {
             "trip_id": trip_id,
@@ -686,16 +807,18 @@ def process_heartbeat_ingest(heartbeat_row: dict) -> dict:
         user = get_user_by_id(user_id)
         recipients = _build_recipients(user, heartbeat_row.get("emergency_phone"))
         alert_context = _resolve_trip_alert_context(trip_id, user=user)
+        status_snapshot = {
+            "last_seen_at": timestamp,
+            "last_seen_lat": heartbeat_row.get("gps_lat"),
+            "last_seen_lng": heartbeat_row.get("gps_lng"),
+        }
         _send_and_record_stage_alert(
             user_id=user_id,
             trip_id=trip_id,
             stage=STAGE_3,
-            message=(
-                f"SafePassage update: {alert_context.get('traveler_name') or 'The traveler'} "
-                f"is back online ({_format_trip_window(alert_context)})."
-            ),
+            message=_build_stage_3_heartbeat_recovery_message(alert_context, status_snapshot, timestamp),
             recipients=recipients,
-            escalation_context={"recovery": True},
+            escalation_context={"recovery": True, "recovery_type": "heartbeat-online", "detected_at": timestamp},
         )
         update_status(
             user_id,
@@ -737,11 +860,7 @@ def apply_stage_1_contact_response(
     alert_context = _resolve_trip_alert_context(trip_id, user=user)
 
     if can_contact:
-        message = (
-            f"SafePassage update: emergency contact confirmed "
-            f"{alert_context.get('traveler_name') or 'the traveler'} is reachable "
-            f"({_format_trip_window(alert_context)})."
-        )
+        message = _build_stage_3_yes_recovery_message(alert_context, confirmed_by)
         created_alert_event = _send_and_record_stage_alert(
             user_id=user_id,
             trip_id=trip_id,
@@ -753,6 +872,7 @@ def apply_stage_1_contact_response(
                 "confirmed_by": confirmed_by,
                 "source": source,
                 "note": note or "",
+                "rearm_buffer_minutes": STAGE_1_REARM_BUFFER_MINUTES,
             },
         )
         update_status(
@@ -786,9 +906,22 @@ def apply_stage_1_contact_response(
             "user_id": user_id,
         }
 
-    message = (
-        "URGENT: Emergency contact confirmed the traveler remains unreachable. "
-        f"Escalating to Stage 2 ({_format_trip_window(alert_context)})."
+    last_seen_at = status.get("last_seen_at")
+    offline_duration_minutes = 0
+    if last_seen_at:
+        try:
+            offline_duration_minutes = max(
+                0,
+                int((datetime.now(timezone.utc) - _parse_iso(last_seen_at)).total_seconds() // 60),
+            )
+        except Exception:
+            offline_duration_minutes = 0
+
+    message = _build_stage_2_message(
+        alert_context=alert_context,
+        status=status,
+        offline_duration_minutes=offline_duration_minutes,
+        adjusted_expected=derive_expected_offline_minutes(trip_id),
     )
     created_alert_event = _send_and_record_stage_alert(
         user_id=user_id,
@@ -938,13 +1071,63 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
             )
 
     current_stage = status.get("current_stage", "none")
+
+    if current_stage in {STAGE_1, STAGE_2} and str(status.get("last_network_status") or "").lower() == "online":
+        dedupe_window = 10
+        if has_recent_stage_alert(user_id, trip_id, STAGE_3, dedupe_window):
+            return {
+                "trip_id": trip_id,
+                "status": "deduped",
+                "trigger_stage": STAGE_3,
+            }
+
+        user = get_user_by_id(user_id)
+        recipients = _build_recipients(user, status.get("emergency_phone"))
+        alert_context = _resolve_trip_alert_context(trip_id, trip=trip, user=user)
+        detected_at_iso = _format_last_seen(status)
+        created_alert_event = _send_and_record_stage_alert(
+            user_id=user_id,
+            trip_id=trip_id,
+            stage=STAGE_3,
+            message=_build_stage_3_heartbeat_recovery_message(alert_context, status, detected_at_iso),
+            recipients=recipients,
+            escalation_context={
+                "recovery": True,
+                "recovery_type": "watchdog-online-status",
+                "detected_at": detected_at_iso,
+            },
+        )
+        update_status(
+            user_id,
+            trip_id,
+            {
+                "current_stage": STAGE_3,
+                "monitoring_state": "resolved",
+                "last_stage_change_at": now_utc.isoformat(),
+                "last_evaluated_at": now_utc.isoformat(),
+            },
+        )
+        return {
+            "trip_id": trip_id,
+            "status": "recovered",
+            "trigger_stage": STAGE_3,
+            "offline_duration_minutes": offline_duration_minutes,
+            "expected_offline_minutes": adjusted_expected,
+            "alert_event": created_alert_event,
+        }
+
     trigger_stage = "none"
+    force_resend_stage_1 = False
     if force_stage_1_test_mode:
         trigger_stage = STAGE_1
     else:
         if current_stage in {"none", ""}:
             if should_trigger_alert(offline_duration_minutes, adjusted_expected):
-                stage_1_allowed, stage_1_reason = is_stage_1_rearmed(user_id, trip_id, buffer_minutes=30)
+                stage_1_allowed, stage_1_reason = is_stage_1_rearmed(
+                    user_id,
+                    trip_id,
+                    buffer_minutes=STAGE_1_REARM_BUFFER_MINUTES,
+                )
                 if stage_1_allowed:
                     trigger_stage = STAGE_1
                 else:
@@ -956,7 +1139,17 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
                         "expected_offline_minutes": adjusted_expected,
                         "reason": stage_1_reason,
                     }
-        elif current_stage == STAGE_1 and offline_duration_minutes >= stage_2_threshold:
+        elif current_stage == STAGE_1:
+            latest_stage_alert = get_latest_trip_stage_alert(user_id, trip_id)
+            if not latest_stage_alert:
+                logger.warning(
+                    "[watchdog] stage_1_history_missing trip_id=%s; re-sending stage_1 alert",
+                    trip_id,
+                )
+                trigger_stage = STAGE_1
+                force_resend_stage_1 = True
+
+        if trigger_stage == "none" and current_stage == STAGE_1 and offline_duration_minutes >= stage_2_threshold:
             since = None
             last_stage_change_at = status.get("last_stage_change_at")
             if last_stage_change_at:
@@ -982,7 +1175,9 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
             "expected_offline_minutes": adjusted_expected,
         }
 
-    if trigger_stage == current_stage and not (force_stage_1_test_mode and trigger_stage == STAGE_1):
+    if trigger_stage == current_stage and not (
+        (force_stage_1_test_mode and trigger_stage == STAGE_1) or force_resend_stage_1
+    ):
         return {
             "trip_id": trip_id,
             "status": "unchanged-stage",
@@ -1002,11 +1197,11 @@ def evaluate_status_for_alert(status: dict, now_utc: datetime) -> dict:
         message = _build_stage_1_message(alert_context, force_stage_1_test_mode)
     else:
         alert_context = _resolve_trip_alert_context(trip_id, trip=trip, user=user)
-        message = (
-            "URGENT: SafePassage has not regained contact with "
-            f"{alert_context.get('traveler_name') or 'the traveler'} for {offline_duration_minutes} minutes. "
-            f"Itinerary: {_format_trip_window(alert_context)}. "
-            f"Expected reconnect window: {adjusted_expected} minutes."
+        message = _build_stage_2_message(
+            alert_context=alert_context,
+            status=status,
+            offline_duration_minutes=offline_duration_minutes,
+            adjusted_expected=adjusted_expected,
         )
     escalation_context = {
         "threshold_rule": "forced-stage-1-test-mode" if force_stage_1_test_mode else "offline > expected * multiplier",

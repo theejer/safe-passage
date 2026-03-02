@@ -900,6 +900,11 @@ def test_stage2_waits_for_contact_confirmation(monkeypatch):
         "get_trip_by_id",
         lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
     )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_latest_trip_stage_alert",
+        lambda *_args, **_kwargs: {"stage": heartbeat_monitor.STAGE_1},
+    )
     monkeypatch.setattr(heartbeat_monitor, "derive_expected_offline_minutes", lambda _trip_id: 90)
     monkeypatch.setattr(heartbeat_monitor, "has_stage_1_confirmation", lambda *_args, **_kwargs: False)
 
@@ -934,6 +939,11 @@ def test_stage2_triggers_after_contact_confirmation(monkeypatch):
         heartbeat_monitor,
         "get_trip_by_id",
         lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_latest_trip_stage_alert",
+        lambda *_args, **_kwargs: {"stage": heartbeat_monitor.STAGE_1},
     )
     monkeypatch.setattr(heartbeat_monitor, "derive_expected_offline_minutes", lambda _trip_id: 90)
     monkeypatch.setattr(heartbeat_monitor, "has_stage_1_confirmation", lambda *_args, **_kwargs: True)
@@ -1297,3 +1307,346 @@ def test_monitoring_expectation_calculation_demo_prints(monkeypatch):
 
     assert len(printed_rows) == 3
     assert printed_rows[0]["expected_offline_minutes"] > printed_rows[1]["expected_offline_minutes"]
+
+
+def test_apply_stage1_yes_sends_personalized_stage3_recovery(monkeypatch):
+    created_alerts: list[dict] = []
+    status_updates: list[dict] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_status_for_trip",
+        lambda _user_id, _trip_id: {
+            "id": "sts_1",
+            "user_id": "usr_1",
+            "trip_id": "trp_1",
+            "current_stage": heartbeat_monitor.STAGE_1,
+            "monitoring_state": "alerted",
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_user_by_id",
+        lambda _user_id: {
+            "id": "usr_1",
+            "emergency_contact": {
+                "name": "Anil Sharma",
+                "phone": "+6592000002",
+                "telegram_chat_id": "123456",
+                "telegram_bot_active": True,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_alert_context",
+        lambda _trip_id: {
+            "id": "trp_1",
+            "traveler_name": "Aarti Kumari",
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-05",
+            "destination_country": "India",
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda _chat_id, _message, bot_token=None: {"queued": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "create_alert_event",
+        lambda payload: created_alerts.append(payload) or payload,
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "update_status",
+        lambda user_id, trip_id, updates: status_updates.append(
+            {"user_id": user_id, "trip_id": trip_id, "updates": updates}
+        )
+        or {"ok": True},
+    )
+
+    result = heartbeat_monitor.apply_stage_1_contact_response(
+        user_id="usr_1",
+        trip_id="trp_1",
+        can_contact=True,
+        confirmed_by="Anil Sharma",
+        source="telegram",
+    )
+
+    assert result["status"] == "deescalated"
+    assert result["stage"] == heartbeat_monitor.STAGE_3
+    assert len(created_alerts) == 1
+    assert "Thank you Anil Sharma" in created_alerts[0]["message"]
+    assert "safety buffer" in created_alerts[0]["message"]
+    assert created_alerts[0]["escalation_context"]["rearm_buffer_minutes"] == heartbeat_monitor.STAGE_1_REARM_BUFFER_MINUTES
+    assert status_updates[0]["updates"]["current_stage"] == heartbeat_monitor.STAGE_3
+
+
+def test_apply_stage1_no_escalates_with_bihar_emergency_details(monkeypatch):
+    created_alerts: list[dict] = []
+    status_updates: list[dict] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_status_for_trip",
+        lambda _user_id, _trip_id: {
+            "id": "sts_1",
+            "user_id": "usr_1",
+            "trip_id": "trp_1",
+            "current_stage": heartbeat_monitor.STAGE_1,
+            "monitoring_state": "alerted",
+            "last_seen_at": "2026-03-02T07:00:00Z",
+            "last_seen_lat": 25.5941,
+            "last_seen_lng": 85.1376,
+            "last_battery_percent": 17,
+            "last_network_status": "offline",
+            "location_risk": "high",
+            "connectivity_risk": "severe",
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_user_by_id",
+        lambda _user_id: {
+            "id": "usr_1",
+            "emergency_contact": {
+                "name": "Anil Sharma",
+                "phone": "+6592000002",
+                "telegram_chat_id": "123456",
+                "telegram_bot_active": True,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_alert_context",
+        lambda _trip_id: {
+            "id": "trp_1",
+            "traveler_name": "Aarti Kumari",
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-05",
+            "destination_country": "India",
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "record_stage_1_contact_confirmation",
+        lambda **_kwargs: {"status": "confirmed"},
+    )
+    monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(heartbeat_monitor, "derive_expected_offline_minutes", lambda _trip_id: 90)
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda _chat_id, _message, bot_token=None: {"queued": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "create_alert_event",
+        lambda payload: created_alerts.append(payload) or payload,
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "update_status",
+        lambda user_id, trip_id, updates: status_updates.append(
+            {"user_id": user_id, "trip_id": trip_id, "updates": updates}
+        )
+        or {"ok": True},
+    )
+
+    result = heartbeat_monitor.apply_stage_1_contact_response(
+        user_id="usr_1",
+        trip_id="trp_1",
+        can_contact=False,
+        confirmed_by="Anil Sharma",
+        source="telegram",
+    )
+
+    assert result["status"] == "escalated"
+    assert result["stage"] == heartbeat_monitor.STAGE_2
+    assert len(created_alerts) == 1
+    stage_2_message = created_alerts[0]["message"]
+    assert "STAGE 2 ESCALATION" in stage_2_message
+    assert "LAST KNOWN STATUS" in stage_2_message
+    assert "Last Heartbeat:" in stage_2_message
+    assert "Bihar, India" in stage_2_message
+    assert "National Emergency: 112" in stage_2_message
+    assert "SINGAPORE EMBASSY / CONSULAR SUPPORT" in stage_2_message
+    assert status_updates[0]["updates"]["current_stage"] == heartbeat_monitor.STAGE_2
+
+
+def test_watchdog_online_status_recovers_to_stage3(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    sent_telegram: list[tuple[str, str]] = []
+    created_alerts: list[dict] = []
+    status_updates: list[dict] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_by_id",
+        lambda _trip_id: {
+            "id": "trp_1",
+            "user_id": "usr_1",
+            "heartbeat_enabled": True,
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-05",
+            "destination_country": "India",
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_user_by_id",
+        lambda _user_id: {
+            "id": "usr_1",
+            "full_name": "Aarti Kumari",
+            "emergency_contact": {
+                "name": "Anil Sharma",
+                "phone": "+6592000002",
+                "telegram_chat_id": "123456",
+                "telegram_bot_active": True,
+            },
+        },
+    )
+    monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda chat_id, message, bot_token=None: sent_telegram.append((chat_id, message)) or {"queued": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "create_alert_event",
+        lambda payload: created_alerts.append(payload) or payload,
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "update_status",
+        lambda user_id, trip_id, updates: status_updates.append(
+            {"user_id": user_id, "trip_id": trip_id, "updates": updates}
+        )
+        or {"ok": True},
+    )
+
+    status = {
+        "id": "sts_1",
+        "user_id": "usr_1",
+        "trip_id": "trp_1",
+        "last_seen_at": "2026-03-02T12:00:00Z",
+        "last_seen_lat": 25.5941,
+        "last_seen_lng": 85.1376,
+        "last_network_status": "online",
+        "current_stage": heartbeat_monitor.STAGE_2,
+        "monitoring_state": "alerted",
+    }
+
+    result = heartbeat_monitor.evaluate_status_for_alert(status, now)
+
+    assert result["status"] == "recovered"
+    assert result["trigger_stage"] == heartbeat_monitor.STAGE_3
+    assert len(created_alerts) == 1
+    assert "Heartbeat detected at" in created_alerts[0]["message"]
+    assert len(sent_telegram) == 1
+    assert status_updates[0]["updates"]["current_stage"] == heartbeat_monitor.STAGE_3
+
+
+def test_stage2_message_explicitly_states_no_heartbeat_when_missing_data():
+    message = heartbeat_monitor._build_stage_2_message(
+        alert_context={
+            "traveler_name": "Aarti Kumari",
+            "start_date": "2026-03-01",
+            "end_date": "2026-03-05",
+            "destination_country": "India",
+        },
+        status={
+            "last_seen_at": None,
+            "last_seen_lat": None,
+            "last_seen_lng": None,
+            "last_battery_percent": None,
+            "last_network_status": None,
+            "location_risk": None,
+            "connectivity_risk": None,
+        },
+        offline_duration_minutes=0,
+        adjusted_expected=90,
+    )
+
+    assert "No heartbeat received yet" in message
+    assert "No GPS fix recorded yet" in message
+    assert "No battery telemetry received yet" in message
+    assert "No network telemetry received yet" in message
+
+
+def test_stage1_resends_when_history_missing(monkeypatch):
+    now = datetime(2026, 3, 2, 12, 0, 0, tzinfo=timezone.utc)
+    last_seen = now - timedelta(minutes=300)
+
+    sent_telegram: list[tuple[str, str]] = []
+    created_alerts: list[dict] = []
+    status_updates: list[dict] = []
+
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_trip_by_id",
+        lambda _trip_id: {"id": "trp_1", "user_id": "usr_1", "heartbeat_enabled": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "derive_monitoring_expectation",
+        lambda _status, _trip_id, _now: {
+            "expected_offline_minutes": 90,
+            "threshold_multiplier": 1.5,
+        },
+    )
+    monkeypatch.setattr(heartbeat_monitor, "get_latest_trip_stage_alert", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(heartbeat_monitor, "has_recent_stage_alert", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "get_user_by_id",
+        lambda _user_id: {
+            "id": "usr_1",
+            "emergency_contact": {
+                "name": "Anil Sharma",
+                "phone": "+6592000002",
+                "telegram_chat_id": "123456",
+                "telegram_bot_active": True,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "send_telegram_alert",
+        lambda chat_id, message, bot_token=None: sent_telegram.append((chat_id, message)) or {"queued": True},
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "create_alert_event",
+        lambda payload: created_alerts.append(payload) or payload,
+    )
+    monkeypatch.setattr(
+        heartbeat_monitor,
+        "update_status",
+        lambda user_id, trip_id, updates: status_updates.append(
+            {"user_id": user_id, "trip_id": trip_id, "updates": updates}
+        )
+        or {"ok": True},
+    )
+
+    status = {
+        "id": "sts_1",
+        "user_id": "usr_1",
+        "trip_id": "trp_1",
+        "last_seen_at": last_seen.isoformat().replace("+00:00", "Z"),
+        "last_network_status": "offline",
+        "current_stage": heartbeat_monitor.STAGE_1,
+        "monitoring_state": "alerted",
+    }
+
+    result = heartbeat_monitor.evaluate_status_for_alert(status, now)
+
+    assert result["status"] == "alerted"
+    assert result["trigger_stage"] == heartbeat_monitor.STAGE_1
+    assert len(created_alerts) == 1
+    assert len(sent_telegram) == 1
+    assert status_updates[0]["updates"]["current_stage"] == heartbeat_monitor.STAGE_1

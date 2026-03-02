@@ -13,6 +13,7 @@ from app.services.heartbeat_monitor import (
     run_watchdog_cycle,
     process_heartbeat_ingest,
     record_stage_1_contact_confirmation,
+    apply_stage_1_contact_response,
 )
 from app.utils.auth import extract_bearer_token, verify_supabase_user_id
 
@@ -104,6 +105,41 @@ def heartbeat_watchdog_confirm_route():
         user_id=user_id,
         trip_id=trip_id,
         confirmed_by=confirmed_by,
+        note=str(note) if note is not None else None,
+    )
+    return jsonify(result)
+
+
+@heartbeats_bp.post("/watchdog/respond")
+def heartbeat_watchdog_respond_route():
+    """Apply emergency-contact YES/NO response for a Stage-1 alert."""
+    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
+    if watchdog_key:
+        provided = request.headers.get("x-watchdog-key", "")
+        if provided != watchdog_key:
+            return jsonify({"error": "invalid watchdog key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str(payload.get("user_id") or "").strip()
+    trip_id = str(payload.get("trip_id") or "").strip()
+    response_text = str(payload.get("response") or "").strip().upper()
+    confirmed_by = str(payload.get("confirmed_by") or "").strip()
+    note = payload.get("note")
+    source = str(payload.get("source") or "telegram").strip() or "telegram"
+
+    if not user_id or not trip_id:
+        return jsonify({"error": "user_id and trip_id are required"}), 400
+    if response_text not in {"YES", "NO"}:
+        return jsonify({"error": "response must be YES or NO"}), 400
+    if not confirmed_by:
+        return jsonify({"error": "confirmed_by is required"}), 400
+
+    result = apply_stage_1_contact_response(
+        user_id=user_id,
+        trip_id=trip_id,
+        can_contact=(response_text == "YES"),
+        confirmed_by=confirmed_by,
+        source=source,
         note=str(note) if note is not None else None,
     )
     return jsonify(result)
