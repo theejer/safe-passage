@@ -17,10 +17,10 @@ COPY . .
 
 # Copy database schema and initialization scripts
 COPY scripts/ scripts/
-COPY contracts/db/ contracts/db/
 
 RUN adduser --disabled-password --gecos "" appuser \
     && chown -R appuser:appuser /app \
+    && sed -i 's/\r$//' docker-entrypoint.sh \
     && chmod +x docker-entrypoint.sh
 
 USER appuser
