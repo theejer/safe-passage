@@ -1,6 +1,6 @@
 import { useLocalSearchParams, Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { View, Text, Alert } from "react-native";
+import { View, Text, Alert, ScrollView } from "react-native";
 import { useTripDetail } from "@/features/trips/hooks/useTripDetail";
 import { RiskSummary } from "@/features/risk/components/RiskSummary";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";

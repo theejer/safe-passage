@@ -9,9 +9,11 @@ type ItineraryReviewProps = {
   onConfirm: (days: Day[]) => void;
   onCheckRisk: (days: Day[]) => void;
   onEdit: () => void;
+  saving?: boolean;
+  checkingRisk?: boolean;
 };
 
-export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: ItineraryReviewProps) {
+export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit, saving = false, checkingRisk = false }: ItineraryReviewProps) {
   const [days, setDays] = useState<Day[]>(itinerary.days);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -166,14 +168,14 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
       </View>
 
       <View style={{ gap: 8, flexDirection: "row" }}>
-        <Button block={false} variant="outline" style={{ flex: 1 }} onPress={onEdit}>
+        <Button block={false} variant="outline" style={{ flex: 1 }} onPress={onEdit} disabled={saving || checkingRisk}>
           Edit File
         </Button>
-        <Button block={false} style={{ flex: 1 }} onPress={() => onConfirm(days)}>
-          Save
+        <Button block={false} style={{ flex: 1 }} onPress={() => onConfirm(days)} disabled={saving || checkingRisk}>
+          {saving ? "Saving..." : "Save"}
         </Button>
-        <Button block={false} variant="secondary" style={{ flex: 1 }} onPress={() => onCheckRisk(days)}>
-          Check Risk
+        <Button block={false} variant="secondary" style={{ flex: 1 }} onPress={() => onCheckRisk(days)} disabled={checkingRisk || saving}>
+          {checkingRisk ? "Checking Risk..." : "Check Risk"}
         </Button>
       </View>
     </ScrollView>

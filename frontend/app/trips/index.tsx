@@ -17,7 +17,8 @@ export default function TripFlowScreen() {
   const [step, setStep] = useState<TripStep>(initialTripId ? "upload" : "tripinfo");
   const [tripId, setTripId] = useState<string | null>(initialTripId || null);
   const [extractedItinerary, setExtractedItinerary] = useState<{ days: Day[] } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [checkingRisk, setCheckingRisk] = useState(false);
 
   function handleTripCreated(id: string) {
     setTripId(id);
@@ -26,9 +27,12 @@ export default function TripFlowScreen() {
 
 
   async function handleConfirmItinerary(days: Day[]) {
-    if (!tripId) return;
+    if (!tripId) {
+      alert("Missing trip ID. Please create or select a trip first.");
+      return;
+    }
     try {
-      setLoading(true);
+      setSaving(true);
       await upsertItinerary(tripId, days);
       setExtractedItinerary({ days });
       setStep("complete");
@@ -39,14 +43,18 @@ export default function TripFlowScreen() {
       console.error("Failed to save itinerary:", error);
       alert("Failed to save itinerary. Please try again.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
   async function handleCheckRisk(days: Day[]) {
-    if (!tripId) return;
+    if (!tripId) {
+      alert("Missing trip ID. Please create or select a trip first.");
+      return;
+    }
     try {
-      setLoading(true);
+      setCheckingRisk(true);
+      console.log("[TripFlow] Check Risk clicked", { tripId, itineraryDays: days.length });
       try {
         await upsertItinerary(tripId, days);
       } catch (persistError) {
@@ -60,7 +68,7 @@ export default function TripFlowScreen() {
       console.error("Failed to analyze risk:", error);
       alert("Failed to analyze risk. Please try again.");
     } finally {
-      setLoading(false);
+      setCheckingRisk(false);
     }
   }
 
@@ -90,6 +98,8 @@ export default function TripFlowScreen() {
           onConfirm={handleConfirmItinerary}
           onCheckRisk={handleCheckRisk}
           onEdit={() => setStep("upload")}
+          saving={saving}
+          checkingRisk={checkingRisk}
         />
       )}
 
