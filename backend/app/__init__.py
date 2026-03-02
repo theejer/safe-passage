@@ -25,10 +25,13 @@ def create_app(config_name: str | None = None) -> Flask:
     """
     app = Flask(__name__)
     app.config.from_object(get_config(config_name))
-    
-    # Enable CORS for web frontend and mobile clients
-    CORS(app, resources={r"/*": {"origins": "*"}})
-    
+    CORS(
+        app,
+        resources={r"/*": {"origins": app.config.get("CORS_ORIGINS", ["*"])}},
+        supports_credentials=app.config.get("CORS_ALLOW_CREDENTIALS", False),
+        allow_headers=["Authorization", "Content-Type"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    )
     app.register_blueprint(reports_bp)
     init_extensions(app)
 

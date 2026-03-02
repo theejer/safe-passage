@@ -6,15 +6,19 @@ services, and external integrations (Supabase, model provider, alerts).
 
 import os
 
-class Config:
-    SQLALCHEMY_DATABASE_URI = os.getenv("SUPABASE_DB_URL")
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+from dotenv import load_dotenv
+
+_backend_root = os.path.dirname(os.path.dirname(__file__))
+load_dotenv(os.path.join(_backend_root, ".env"))
 
 class BaseConfig:
     """Base runtime config shared by local/dev/prod environments."""
 
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
     DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
+
+    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI") or os.getenv("SUPABASE_DB_URL", "")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
@@ -31,6 +35,10 @@ class BaseConfig:
     ENABLE_HEARTBEAT_SCHEDULER = os.getenv("ENABLE_HEARTBEAT_SCHEDULER", "0") == "1"
     HEARTBEAT_WATCHDOG_INTERVAL_MINUTES = int(os.getenv("HEARTBEAT_WATCHDOG_INTERVAL_MINUTES", "5"))
     HEARTBEAT_WATCHDOG_KEY = os.getenv("HEARTBEAT_WATCHDOG_KEY", "")
+
+    _cors_origins = os.getenv("CORS_ORIGINS") or os.getenv("ALLOWED_ORIGINS", "*")
+    CORS_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()] or ["*"]
+    CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "0") == "1"
 
 
 class DevelopmentConfig(BaseConfig):
