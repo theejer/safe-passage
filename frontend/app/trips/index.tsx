@@ -6,6 +6,7 @@ import { ItineraryUpload } from "@/features/trips/components/ItineraryUpload";
 import { ItineraryReview } from "@/features/trips/components/ItineraryReview";
 import { UserInfoForm, UserInfo } from "@/features/trips/components/UserInfoForm";
 import { upsertItinerary } from "@/features/trips/services/itineraryApi";
+import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { Day } from "@/features/trips/types";
 
 type TripStep = "tripinfo" | "upload" | "review" | "userinfo" | "complete";
@@ -36,6 +37,27 @@ export default function TripFlowScreen() {
     } catch (error) {
       console.error("Failed to save itinerary:", error);
       alert("Failed to save itinerary. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCheckRisk(days: Day[]) {
+    if (!tripId) return;
+    try {
+      setLoading(true);
+      try {
+        await upsertItinerary(tripId, days);
+      } catch (persistError) {
+        console.warn("[TripFlow CheckRisk] Continuing without itinerary persistence:", persistError);
+      }
+
+      const report = await analyzeTripRisk(tripId, days);
+      alert(report.summary || "Risk analysis completed.");
+      router.push(`/trips/${tripId}/risk`);
+    } catch (error) {
+      console.error("Failed to analyze risk:", error);
+      alert("Failed to analyze risk. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +95,7 @@ export default function TripFlowScreen() {
         <ItineraryReview
           itinerary={extractedItinerary}
           onConfirm={handleConfirmItinerary}
-          onCheckRisk={handleConfirmItinerary}
+          onCheckRisk={handleCheckRisk}
           onEdit={() => setStep("upload")}
         />
       )}

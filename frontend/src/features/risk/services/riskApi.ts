@@ -22,6 +22,22 @@ type RiskDayWire = {
 type RiskReportWire = {
   days?: RiskDayWire[];
   summary?: string;
+  recommendations?: string[];
+  score?: {
+    value?: number;
+    justification?: string;
+  };
+  score_breakdown?: Record<string, unknown>;
+  judge?: {
+    applied?: boolean;
+    before?: number;
+    after?: number;
+    removed?: number;
+    error?: string | null;
+    reason?: string | null;
+  };
+  analyst_reports?: Record<string, unknown>;
+  final_report?: Record<string, unknown>;
 };
 
 function toWireDays(days: Day[]) {
@@ -49,6 +65,26 @@ function fromWireReport(report: RiskReportWire): RiskReport {
         expectedOfflineMinutes: location.expected_offline_minutes ?? 0,
       })),
     })),
+    recommendations: report.recommendations ?? [],
+    score: report.score
+      ? {
+          value: Number(report.score.value ?? 0),
+          justification: String(report.score.justification ?? ""),
+        }
+      : undefined,
+    scoreBreakdown: report.score_breakdown,
+    judge: report.judge
+      ? {
+          applied: Boolean(report.judge.applied),
+          before: Number(report.judge.before ?? 0),
+          after: Number(report.judge.after ?? 0),
+          removed: Number(report.judge.removed ?? 0),
+          error: report.judge.error,
+          reason: report.judge.reason,
+        }
+      : undefined,
+    analystReports: report.analyst_reports as RiskReport["analystReports"],
+    finalReport: report.final_report,
   };
 }
 
@@ -56,12 +92,20 @@ export async function analyzeTripRisk(tripId: string, days: Day[]): Promise<Risk
   await initializeOfflineDb();
 
   const response = (await apiClient.post("/itinerary/analyze", {
+    contract_version: "1.0.0",
+    request_id: `req_${Date.now()}`,
     trip_id: tripId,
     itinerary: {
       days: toWireDays(days),
       meta: { source: "user-reviewed-itinerary" },
     },
-  })) as { report?: RiskReportWire };
+  })) as { report?: RiskReportWire; request_id?: string; analyzer?: string; saved?: unknown };
+
+  console.log("[analyzeTripRisk] response meta", {
+    request_id: response.request_id,
+    analyzer: response.analyzer,
+    saved: response.saved,
+  });
 
   const normalized = fromWireReport(response.report ?? {});
   await cacheRiskReport(tripId, normalized);

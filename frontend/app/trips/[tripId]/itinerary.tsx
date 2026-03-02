@@ -91,7 +91,11 @@ export default function ItineraryEditorScreen() {
     try {
       validateDays(days);
       setAnalyzing(true);
-      await upsertItinerary(normalizedTripId, days);
+      try {
+        await upsertItinerary(normalizedTripId, days);
+      } catch (persistError) {
+        console.warn("[CheckRisk] Continuing without itinerary persistence:", persistError);
+      }
       const report = await analyzeTripRisk(normalizedTripId, days);
       Alert.alert("Risk ready", report.summary || "Risk analysis completed.");
       router.push(`/trips/${normalizedTripId}/risk`);

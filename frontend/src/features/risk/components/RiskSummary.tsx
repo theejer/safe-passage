@@ -11,7 +11,11 @@ export function RiskSummary({ tripId }: RiskSummaryProps) {
   return (
     <View style={{ borderWidth: 1, borderColor: "#ddd", padding: 10, borderRadius: 8 }}>
       <Text style={{ fontWeight: "700" }}>Risk Summary</Text>
+      {report?.score ? <Text>Score: {report.score.value}/100</Text> : null}
       <Text>{report?.summary ?? "No risk report available yet."}</Text>
+      {(report?.recommendations ?? []).length ? (
+        <Text>Recommendations: {(report?.recommendations ?? []).length}</Text>
+      ) : null}
     </View>
   );
 }
