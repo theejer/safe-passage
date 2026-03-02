@@ -15,6 +15,17 @@ npm install
 npm run start
 ```
 
+## Environment
+Create a local env file from the template:
+
+```powershell
+copy .env.example .env
+```
+
+Supported public variables:
+- `EXPO_PUBLIC_BACKEND_URL` (default: `http://localhost:5000`)
+- `EXPO_PUBLIC_FEATURE_OFFLINE_LLM` (`true`/`false`, default: `false`)
+
 ## Useful Commands
 ```powershell
 npm run start

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
 import { createTrip } from "@/features/trips/services/tripsApi";
 import { getItem } from "@/features/storage/services/localStore";
+import { userExistsRemotely } from "@/features/user/services/userApi";
+import { isLocalOnlyUserId } from "@/shared/utils/syncGuards";
 import { Button } from "@/shared/components/Button";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
@@ -18,6 +20,7 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const formatDateLocal = (date: Date) => {
     const year = date.getFullYear();
@@ -161,13 +164,49 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
   };
 
   async function onSubmit() {
+    setSubmitError(null);
+
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      setSubmitError("Trip title is required.");
+      return;
+    }
+
+    const start = formatDateForAPI(startDate);
+    const end = formatDateForAPI(endDate);
+    if (!start || !end) {
+      setSubmitError("Start date and end date are required.");
+      return;
+    }
+
+    if (start > end) {
+      setSubmitError("End date must be on or after start date.");
+      return;
+    }
+
     if (mode === "create") {
-      const activeUserId = (await getItem(ACTIVE_USER_ID_KEY)) ?? "demo-user";
+      const activeUserId = ((await getItem(ACTIVE_USER_ID_KEY)) ?? "").trim();
+      if (!activeUserId) {
+        setSubmitError("Create your profile first before creating a trip.");
+        return;
+      }
+
+      if (isLocalOnlyUserId(activeUserId)) {
+        setSubmitError("Your profile is local-only. Save profile to backend first, then create the trip.");
+        return;
+      }
+
+      const existsRemotely = await userExistsRemotely(activeUserId);
+      if (!existsRemotely) {
+        setSubmitError("Selected user does not exist on backend yet. Save profile first, then retry.");
+        return;
+      }
+
       const trip = await createTrip({
         userId: activeUserId,
-        title,
-        startDate: formatDateForAPI(startDate),
-        endDate: formatDateForAPI(endDate),
+        title: normalizedTitle,
+        startDate: start,
+        endDate: end,
       });
       onSuccess?.(trip.id);
     }
@@ -211,6 +250,8 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
       />
 
       <Button onPress={() => void onSubmit()}>{mode === "create" ? "Create trip" : "Save changes"}</Button>
+
+      {submitError ? <Text style={{ color: "#b00020" }}>{submitError}</Text> : null}
     </ScrollView>
   );
 }

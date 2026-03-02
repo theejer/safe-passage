@@ -239,3 +239,17 @@ export async function replayEmergencyContactSyncJob(job: SyncQueueJob) {
     });
   }
 }
+
+export async function userExistsRemotely(userId: string) {
+  const normalized = String(userId || "").trim();
+  if (!normalized || isLocalOnlyUserId(normalized)) {
+    return false;
+  }
+
+  try {
+    await apiClient.get(`/api/users/${encodeURIComponent(normalized)}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
