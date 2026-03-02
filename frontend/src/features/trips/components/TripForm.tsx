@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { View, TextInput, Button, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
 import { createTrip } from "@/features/trips/services/tripsApi";
+import { getItem } from "@/features/storage/services/localStore";
+
+const ACTIVE_USER_ID_KEY = "active_user_id";
 
 type TripFormProps = { 
   mode: "create" | "edit";
@@ -147,8 +150,9 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
 
   async function onSubmit() {
     if (mode === "create") {
+      const activeUserId = (await getItem(ACTIVE_USER_ID_KEY)) ?? "demo-user";
       const trip = await createTrip({
-        userId: "demo-user",
+        userId: activeUserId,
         title,
         startDate: formatDateForAPI(startDate),
         endDate: formatDateForAPI(endDate),
@@ -158,7 +162,7 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
   }
 
   return (
-    <View style={{ gap: 8 }}>
+    <ScrollView contentContainerStyle={{ gap: 8 }}>
       <TextInput
         placeholder="Trip title"
         value={title}
@@ -195,6 +199,6 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
       />
 
       <Button title={mode === "create" ? "Create trip" : "Save changes"} onPress={() => void onSubmit()} />
-    </View>
+    </ScrollView>
   );
 }

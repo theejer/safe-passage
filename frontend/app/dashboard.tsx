@@ -1,0 +1,69 @@
+import { Link, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useTrips } from "@/features/trips/hooks/useTrips";
+import { getItem } from "@/features/storage/services/localStore";
+
+const ACTIVE_USER_ID_KEY = "active_user_id";
+
+export default function DashboardScreen() {
+  const router = useRouter();
+  const [userId, setUserId] = useState("demo-user");
+  const { items, loading } = useTrips(userId);
+
+  useEffect(() => {
+    async function loadUserId() {
+      const saved = await getItem(ACTIVE_USER_ID_KEY);
+      if (saved) {
+        setUserId(saved);
+      }
+    }
+
+    void loadUserId();
+  }, []);
+
+  return (
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+      <Text style={{ fontSize: 24, fontWeight: "700" }}>Dashboard</Text>
+      <Text style={{ color: "#4b5563" }}>Manage your trips, view saved trips, and start a trip.</Text>
+
+      <TouchableOpacity
+        style={{ backgroundColor: "#1976d2", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, alignItems: "center" }}
+        onPress={() => router.push("/trips")}
+      >
+        <Text style={{ color: "white", fontWeight: "600", fontSize: 16 }}>Create New Trip</Text>
+      </TouchableOpacity>
+
+      <View style={{ borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, padding: 12, gap: 8, backgroundColor: "white" }}>
+        <Text style={{ fontSize: 18, fontWeight: "700" }}>Saved Trips</Text>
+
+        {loading ? <Text>Loading trips...</Text> : null}
+
+        {!loading && items.length === 0 ? (
+          <Text style={{ color: "#6b7280" }}>
+            No trips yet. Create your first trip to start itinerary upload and risk analysis.
+          </Text>
+        ) : null}
+
+        {!loading
+          ? items.map((trip) => (
+              <View
+                key={trip.id}
+                style={{ borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 10, padding: 10, gap: 8, backgroundColor: "#f9fafb" }}
+              >
+                <Text style={{ fontWeight: "700", fontSize: 16 }}>{trip.title}</Text>
+                <Text style={{ color: "#4b5563" }}>
+                  {trip.startDate} → {trip.endDate}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  <Link href={`/trips/${trip.id}`}>View Trip</Link>
+                  <Link href={`/trips/${trip.id}/start`}>Start Trip</Link>
+                  <Link href={`/trips/${trip.id}/risk`}>Open Risk</Link>
+                </View>
+              </View>
+            ))
+          : null}
+      </View>
+    </ScrollView>
+  );
+}

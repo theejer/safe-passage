@@ -1,7 +1,7 @@
 import { View, TextInput, Button, Text, Modal, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { useUserProfile } from "@/features/user/hooks/useUserProfile";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { isLikelyPhone } from "@/shared/utils/validators";
 
 interface CountryCodeOption {
@@ -9,26 +9,18 @@ interface CountryCodeOption {
   label: string;
 }
 
-export function UserInfoForm() {
+type UserInfoFormProps = {
+  onSaved?: () => void;
+  onSkip?: () => void;
+};
+
+export function UserInfoForm({ onSaved, onSkip }: UserInfoFormProps) {
   // Minimal onboarding form for name + emergency contact phone.
   const router = useRouter();
-  const { profile, setProfile, saveProfile, isSaving, error: saveError, success } = useUserProfile();
+  const { profile, setProfile, saveProfile, isSaving, error: saveError } = useUserProfile();
   const [userCountryCode, setUserCountryCode] = useState("+91");
   const [emergencyCountryCode, setEmergencyCountryCode] = useState("+91");
   const [error, setError] = useState("");
-
-  // Navigate to trips on successful save
-  useEffect(() => {
-    if (success) {
-      console.log("[UserInfoForm] Success state detected, navigating to /trips");
-      try {
-        router.replace("/trips");
-      } catch (navError) {
-        console.error("[UserInfoForm] Navigation error:", navError);
-        setError("Failed to navigate to trips page");
-      }
-    }
-  }, [success, router]);
   const [showUserCountryModal, setShowUserCountryModal] = useState(false);
   const [showEmergencyCountryModal, setShowEmergencyCountryModal] = useState(false);
 
@@ -63,6 +55,11 @@ export function UserInfoForm() {
       console.log("[UserInfoForm] Starting profile save...");
       const result = await saveProfile();
       console.log("[UserInfoForm] Profile saved successfully:", result);
+      if (onSaved) {
+        onSaved();
+      } else {
+        router.replace("/complete");
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save profile";
       console.error("[UserInfoForm] Error saving profile:", errorMessage);
@@ -241,7 +238,13 @@ export function UserInfoForm() {
             borderRadius: 8,
             alignItems: "center"
           }}
-          onPress={() => router.replace("/trips")}
+          onPress={() => {
+            if (onSkip) {
+              onSkip();
+              return;
+            }
+            router.replace("/dashboard");
+          }}
         >
           <Text style={{ color: "#666", fontSize: 16, fontWeight: "500" }}>Skip for now</Text>
         </TouchableOpacity>

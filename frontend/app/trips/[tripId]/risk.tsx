@@ -1,5 +1,5 @@
-import { useLocalSearchParams } from "expo-router";
-import { View, Text } from "react-native";
+import { Link, useLocalSearchParams } from "expo-router";
+import { ScrollView, Text } from "react-native";
 import { RiskCategoryList } from "@/features/risk/components/RiskCategoryList";
 
 export default function TripRiskScreen() {
@@ -7,9 +7,10 @@ export default function TripRiskScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 12 }}>
+    <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: "700" }}>Risk Breakdown</Text>
+      <Link href="/dashboard">Back to Dashboard</Link>
       <RiskCategoryList tripId={String(tripId)} />
-    </View>
+    </ScrollView>
   );
 }

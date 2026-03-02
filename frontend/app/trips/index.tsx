@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { TripForm } from "@/features/trips/components/TripForm";
 import { ItineraryUpload } from "@/features/trips/components/ItineraryUpload";
 import { ItineraryReview } from "@/features/trips/components/ItineraryReview";
-import { UserInfoForm, UserInfo } from "@/features/trips/components/UserInfoForm";
 import { upsertItinerary } from "@/features/trips/services/itineraryApi";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { Day } from "@/features/trips/types";
 
-type TripStep = "tripinfo" | "upload" | "review" | "userinfo" | "complete";
+type TripStep = "tripinfo" | "upload" | "review" | "complete";
 
 export default function TripFlowScreen() {
   const router = useRouter();
@@ -18,7 +17,6 @@ export default function TripFlowScreen() {
   const [step, setStep] = useState<TripStep>(initialTripId ? "upload" : "tripinfo");
   const [tripId, setTripId] = useState<string | null>(initialTripId || null);
   const [extractedItinerary, setExtractedItinerary] = useState<{ days: Day[] } | null>(null);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(false);
 
   function handleTripCreated(id: string) {
@@ -33,7 +31,10 @@ export default function TripFlowScreen() {
       setLoading(true);
       await upsertItinerary(tripId, days);
       setExtractedItinerary({ days });
-      setStep("userinfo");
+      setStep("complete");
+      setTimeout(() => {
+        router.replace("/dashboard");
+      }, 1200);
     } catch (error) {
       console.error("Failed to save itinerary:", error);
       alert("Failed to save itinerary. Please try again.");
@@ -63,21 +64,13 @@ export default function TripFlowScreen() {
     }
   }
 
-  function handleUserInfoSubmit(info: UserInfo) {
-    setUserInfo(info);
-    setStep("complete");
-    setTimeout(() => {
-      router.push(`/trips/${tripId}`);
-    }, 1500);
-  }
-
   return (
     <View style={{ flex: 1, backgroundColor: "white" }}>
       {step === "tripinfo" && (
-        <View style={{ flex: 1, padding: 16, gap: 12 }}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
           <Text style={{ fontSize: 20, fontWeight: "700" }}>Create Trip</Text>
           <TripForm mode="create" onSuccess={handleTripCreated} />
-        </View>
+        </ScrollView>
       )}
 
       {step === "upload" && tripId && (
@@ -100,19 +93,15 @@ export default function TripFlowScreen() {
         />
       )}
 
-      {step === "userinfo" && (
-        <UserInfoForm onSubmit={handleUserInfoSubmit} />
-      )}
-
       {step === "complete" && (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 16 }}>
+        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", alignItems: "center", padding: 16 }}>
           <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>
             ✓ Trip Created
           </Text>
           <Text style={{ fontSize: 14, color: "#666", marginTop: 12, textAlign: "center" }}>
-            Your trip and itinerary have been saved successfully.
+            Your trip and itinerary have been saved successfully. Returning to dashboard...
           </Text>
-        </View>
+        </ScrollView>
       )}
     </View>
   );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadItineraryPDF } from "@/features/trips/services/itineraryApi";
 import { Day } from "../types";
@@ -79,7 +79,7 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
   }
 
   return (
-    <View style={{ flex: 1, padding: 16, justifyContent: "center", alignItems: "center", gap: 16 }}>
+    <ScrollView contentContainerStyle={{ flexGrow: 1, padding: 16, justifyContent: "center", alignItems: "center", gap: 16 }}>
       <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>Upload Itinerary File</Text>
       <Text style={{ fontSize: 14, color: "#666", textAlign: "center" }}>
         Select a PDF or document containing your trip itinerary. We&apos;ll extract the details automatically.
@@ -130,6 +130,6 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
           </TouchableOpacity>
         </>
       )}
-    </View>
+    </ScrollView>
   );
 }

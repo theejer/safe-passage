@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 
 const DEFAULT_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? "http://localhost:5000";
 
@@ -23,8 +24,10 @@ export function getBackendUrlCandidates() {
   const candidates = [DEFAULT_BACKEND_URL];
 
   if (isLocalhostUrl(DEFAULT_BACKEND_URL)) {
-    candidates.push(DEFAULT_BACKEND_URL.replace("localhost", "10.0.2.2"));
-    candidates.push(DEFAULT_BACKEND_URL.replace("127.0.0.1", "10.0.2.2"));
+    if (Platform.OS !== "web") {
+      candidates.push(DEFAULT_BACKEND_URL.replace("localhost", "10.0.2.2"));
+      candidates.push(DEFAULT_BACKEND_URL.replace("127.0.0.1", "10.0.2.2"));
+    }
 
     const devHostUrl = parseDevHostUrl();
     if (devHostUrl) {

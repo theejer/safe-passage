@@ -1,7 +1,7 @@
 """Configuration objects for SafePassage backend.
 
 This module centralizes environment-driven settings used by routes,
-services, and external integrations (Supabase, model provider, alerts).
+services, and external integrations.
 """
 
 import os
@@ -12,18 +12,13 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-from dotenv import load_dotenv
-
-_backend_root = os.path.dirname(os.path.dirname(__file__))
-load_dotenv(os.path.join(_backend_root, ".env"))
-
 class BaseConfig:
     """Base runtime config shared by local/dev/prod environments."""
 
     FLASK_ENV = os.getenv("FLASK_ENV", "development")
     DEBUG = os.getenv("FLASK_DEBUG", "0") == "1"
 
-    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI") or os.getenv("SUPABASE_DB_URL", "")
+    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI") or f"sqlite:///{BASE_DIR / 'safepassage.db'}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SUPABASE_URL = os.getenv("SUPABASE_URL", "")
