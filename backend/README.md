@@ -87,6 +87,9 @@ $env:TELEGRAM_POLL_INTERVAL_SECONDS="2"
 $env:ENABLE_HEARTBEAT_SCHEDULER="0"
 $env:HEARTBEAT_WATCHDOG_INTERVAL_MINUTES="5"
 $env:HEARTBEAT_WATCHDOG_KEY=""
+
+# Demo-only heartbeat auth fallback (non-production only)
+$env:HEARTBEAT_DEMO_AUTH_FALLBACK="0"
 ```
 
 ## Run the Backend
@@ -153,7 +156,7 @@ flask run --host 0.0.0.0 --port 5000
 - `GET /trips/<trip_id>/itinerary`
 - `POST /itinerary/analyze`
 - `POST /itinerary/analyze-pipeline`
-- `POST /heartbeat` (JWT required, returns 204)
+- `POST /heartbeat` (JWT required; in non-production, optional demo fallback when `HEARTBEAT_DEMO_AUTH_FALLBACK=1`)
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
 
