@@ -42,17 +42,22 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
         name: file.name || "itinerary.pdf",
       } as any);
 
-      const response = await uploadItineraryPDF(formData);
+      console.log("[ItineraryUpload] Uploading PDF for trip:", tripId);
+      const days = await uploadItineraryPDF(formData);
       setLoading(false);
 
-      if (response.days && response.days.length > 0) {
-        onItineraryExtracted(response);
+      console.log("[ItineraryUpload] Extracted days:", days);
+      if (days && days.length > 0) {
+        console.log("[ItineraryUpload] Successfully extracted itinerary with", days.length, "days");
+        onItineraryExtracted({ days });
       } else {
-        setError("Could not extract itinerary data from PDF");
+        setError("Could not extract any itinerary data from PDF. Please ensure the PDF contains travel dates and locations.");
       }
     } catch (err: any) {
       setLoading(false);
-      setError(err.message || "Failed to process PDF");
+      const errorMessage = err.message || "Failed to process PDF";
+      console.error("[ItineraryUpload] Error:", errorMessage);
+      setError(errorMessage);
     }
   }
 

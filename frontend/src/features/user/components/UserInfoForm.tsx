@@ -20,7 +20,13 @@ export function UserInfoForm() {
   // Navigate to trips on successful save
   useEffect(() => {
     if (success) {
-      router.replace("/trips");
+      console.log("[UserInfoForm] Success state detected, navigating to /trips");
+      try {
+        router.replace("/trips");
+      } catch (navError) {
+        console.error("[UserInfoForm] Navigation error:", navError);
+        setError("Failed to navigate to trips page");
+      }
     }
   }, [success, router]);
   const [showUserCountryModal, setShowUserCountryModal] = useState(false);
@@ -36,7 +42,7 @@ export function UserInfoForm() {
     { code: "+86", label: "China (+86)" },
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setError("");
     const userFullPhone = userCountryCode + (profile.phone || "").trim();
     const emergencyFullPhone = emergencyCountryCode + (profile.emergencyContact?.phone || "").trim();
@@ -53,7 +59,15 @@ export function UserInfoForm() {
       return;
     }
 
-    void saveProfile();
+    try {
+      console.log("[UserInfoForm] Starting profile save...");
+      const result = await saveProfile();
+      console.log("[UserInfoForm] Profile saved successfully:", result);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to save profile";
+      console.error("[UserInfoForm] Error saving profile:", errorMessage);
+      setError(errorMessage);
+    }
   };
 
   const CountryCodePicker = ({
@@ -196,13 +210,43 @@ export function UserInfoForm() {
       </View>
 
       {error || saveError ? (
-        <Text style={{ color: "red", fontSize: 14 }}>
-          {error || saveError}
-        </Text>
+        <View style={{ backgroundColor: "#ffebee", borderRadius: 8, padding: 12, borderLeftWidth: 4, borderLeftColor: "#f44336" }}>
+          <Text style={{ color: "#c62828", fontSize: 14, fontWeight: "500" }}>
+            ⚠️ Error
+          </Text>
+          <Text style={{ color: "#d32f2f", fontSize: 12, marginTop: 4 }}>
+            {error || saveError}
+          </Text>
+        </View>
       ) : null}
 
-      <Button title={isSaving ? "Saving..." : "Save"} onPress={handleSave} />
-      <Text style={{ color: "#666" }}>Profile is used for alerts and trip ownership.</Text>
+      {isSaving && (
+        <Text style={{ color: "#1976d2", fontSize: 12 }}>
+          ⏳ Saving profile...
+        </Text>
+      )}
+
+      <View style={{ gap: 8 }}>
+        <Button 
+          title={isSaving ? "Saving..." : "Save Profile"} 
+          onPress={handleSave}
+          disabled={isSaving || !profile.fullName || !profile.phone}
+        />
+        <TouchableOpacity 
+          style={{ 
+            paddingVertical: 12, 
+            paddingHorizontal: 16, 
+            borderWidth: 1, 
+            borderColor: "#999",
+            borderRadius: 8,
+            alignItems: "center"
+          }}
+          onPress={() => router.replace("/trips")}
+        >
+          <Text style={{ color: "#666", fontSize: 16, fontWeight: "500" }}>Skip for now</Text>
+        </TouchableOpacity>
+      </View>
+      <Text style={{ color: "#666", fontSize: 12 }}>Profile is used for alerts and trip ownership.</Text>
     </View>
   );
 }

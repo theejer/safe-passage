@@ -2,9 +2,12 @@ import { useState } from "react";
 import { View, TextInput, Button, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
 import { createTrip } from "@/features/trips/services/tripsApi";
 
-type TripFormProps = { mode: "create" | "edit" };
+type TripFormProps = { 
+  mode: "create" | "edit";
+  onSuccess?: (tripId: string) => void;
+};
 
-export function TripForm({ mode }: TripFormProps) {
+export function TripForm({ mode, onSuccess }: TripFormProps) {
   // Minimal create/edit form scaffold for trip metadata.
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(null);
@@ -144,12 +147,13 @@ export function TripForm({ mode }: TripFormProps) {
 
   async function onSubmit() {
     if (mode === "create") {
-      await createTrip({
+      const trip = await createTrip({
         userId: "demo-user",
         title,
         startDate: formatDateForAPI(startDate),
         endDate: formatDateForAPI(endDate),
       });
+      onSuccess?.(trip.id);
     }
   }
 

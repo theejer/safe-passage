@@ -76,3 +76,21 @@ export async function getLatestItinerary(tripId: string) {
     return getItinerary(tripId);
   }
 }
+
+// Upload PDF file and extract itinerary using backend PDF parser
+export async function uploadItineraryPDF(formData: FormData) {
+  const env = await import("@/shared/config/env").then(m => m.env);
+  
+  const response = await fetch(`${env.BACKEND_URL}/trips/upload-pdf`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to upload PDF: ${response.status} ${error}`);
+  }
+
+  const result = (await response.json()) as { days?: DayWire[] };
+  return fromWireDays(result.days ?? []);
+}

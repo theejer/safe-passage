@@ -14,14 +14,22 @@ export function useUserProfile() {
     setError(null);
     setSuccess(false);
     try {
+      console.log("[useUserProfile] Creating user with profile:", profile);
       const created = await createUser(profile);
+      console.log("[useUserProfile] User created:", created);
+      
       if (created?.id && profile.emergencyContact) {
+        console.log("[useUserProfile] Updating emergency contact for user:", created.id);
         await updateUserEmergencyContact(created.id, profile.emergencyContact);
+        console.log("[useUserProfile] Emergency contact updated");
       }
+      
+      console.log("[useUserProfile] Marking save as successful");
       setSuccess(true);
       return created;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to save profile";
+      console.error("[useUserProfile] Save error:", message);
       setError(message);
       throw err;
     } finally {

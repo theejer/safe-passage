@@ -26,12 +26,16 @@ def init_extensions(app: Flask) -> None:
 
     logging.basicConfig(level=logging.INFO)
 
-    url = app.config.get("SUPABASE_URL")
-    key = app.config.get("SUPABASE_KEY")
-    if url and key:
-        supabase_client = create_client(url, key)
+    url = app.config.get("SUPABASE_URL", "").strip()
+    key = app.config.get("SUPABASE_KEY", "").strip()
+    
+    if url and key and not url.startswith("https://your-"):
+        try:
+            supabase_client = create_client(url, key)
+        except Exception as e:
+            app.logger.warning(f"Supabase initialization failed: {e}. Continuing in degraded mode.")
     else:
-        app.logger.warning("Supabase credentials are missing; DB calls may fail.")
+        app.logger.warning("Supabase credentials are missing or invalid; DB calls may fail.")
 
 
 def get_supabase() -> Client:
