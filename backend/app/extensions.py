@@ -29,12 +29,8 @@ def init_extensions(app: Flask) -> None:
     logging.basicConfig(level=logging.INFO)
 
     url = app.config.get("SUPABASE_URL")
-    key = app.config.get("SUPABASE_KEY")
     if url and key:
         supabase_client = create_client(url, key)
-    else:
-        app.logger.warning("Supabase credentials are missing; DB calls may fail.")
-
     sqlalchemy_uri = app.config.get("SQLALCHEMY_DATABASE_URI")
     if sqlalchemy_uri:
         sqlalchemy_engine = create_engine(sqlalchemy_uri, pool_pre_ping=True)
