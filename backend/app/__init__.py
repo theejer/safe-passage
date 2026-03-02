@@ -39,17 +39,13 @@ def create_app(config_name: str | None = None) -> Flask:
     def _ensure_cors_headers(response):
         origin = request.headers.get("Origin")
         allowed_origins = app.config.get("CORS_ORIGINS", ["*"])
-        if origin and ("*" in allowed_origins or origin in allowed_origins):
-            response.headers.setdefault("Access-Control-Allow-Origin", origin if origin else "*")
-            response.headers.setdefault("Vary", "Origin")
-            response.headers.setdefault(
-                "Access-Control-Allow-Headers",
-                "Authorization, Content-Type, Cache-Control",
-            )
-            response.headers.setdefault(
-                "Access-Control-Allow-Methods",
-                "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-            )
+        if "*" in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+        elif origin and origin in allowed_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Cache-Control"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         return response
 
     app.register_blueprint(reports_bp)
@@ -70,7 +66,6 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(trips_bp, url_prefix="/trips")
     app.register_blueprint(trips_bp, url_prefix="/api/trips", name="api_trips")
     app.register_blueprint(itinerary_analysis_bp, url_prefix="/itinerary")
-    app.register_blueprint(heartbeats_bp, url_prefix="/heartbeat", name="heartbeat_alias")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeats")
     app.register_blueprint(incidents_bp, url_prefix="/incidents")
 

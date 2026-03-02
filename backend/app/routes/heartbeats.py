@@ -15,7 +15,10 @@ from app.services.heartbeat_monitor import (
     record_stage_1_contact_confirmation,
     apply_stage_1_contact_response,
 )
+from app.utils.logging import get_logger
+
 heartbeats_bp = Blueprint("heartbeats", __name__)
+logger = get_logger(__name__)
 
 
 @heartbeats_bp.post("")
@@ -24,13 +27,8 @@ def heartbeat_ingest_route():
     try:
         payload = HeartbeatIngestSchema.model_validate(request.get_json(force=True)).model_dump()
     except ValidationError as exc:
+        logger.error(f"Heartbeat validation error: {exc}")
         return jsonify({"error": "invalid heartbeat payload", "details": exc.errors()}), 400
-
-    trip = get_trip_by_id(payload["trip_id"])
-    if not trip:
-        return jsonify({"error": "trip not found"}), 404
-    if trip.get("heartbeat_enabled") is False:
-        return jsonify({"error": "heartbeat monitoring disabled for trip"}), 409
 
     gps = payload.get("gps") or {}
     heartbeat_row = {
@@ -46,10 +44,15 @@ def heartbeat_ingest_route():
         "source": payload.get("source"),
         "emergency_phone": payload.get("emergency_phone"),
     }
-    insert_heartbeat(heartbeat_row)
-    process_heartbeat_ingest(heartbeat_row)
-
-    return ("", 204)
+    
+    try:
+        insert_heartbeat(heartbeat_row)
+        process_heartbeat_ingest(heartbeat_row)
+        logger.info(f"Heartbeat ingested successfully for user={payload['user_id']} trip={payload['trip_id']}")
+        return ("", 204)
+    except Exception as exc:
+        logger.error(f"Heartbeat ingest error: {exc}", exc_info=True)
+        return jsonify({"error": "Failed to process heartbeat", "details": str(exc)}), 500
 
 
 @heartbeats_bp.post("/watchdog/run")

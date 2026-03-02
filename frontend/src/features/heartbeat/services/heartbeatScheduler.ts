@@ -21,7 +21,7 @@ import {
 } from "@/features/heartbeat/services/heartbeatApi";
 
 const HEARTBEAT_TASK_NAME = "safepassage-heartbeat-task";
-const HEARTBEAT_INTERVAL_MS = HEARTBEAT_INTERVAL_MINUTES * 180 * 1000;
+const HEARTBEAT_INTERVAL_MS = HEARTBEAT_INTERVAL_MINUTES * 60 * 1000;
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 const ACTIVE_TRIP_ID_KEY = "active_trip_id";
