@@ -31,7 +31,7 @@ def create_app(config_name: str | None = None) -> Flask:
         app,
         resources={r"/*": {"origins": app.config.get("CORS_ORIGINS", ["*"])}},
         supports_credentials=app.config.get("CORS_ALLOW_CREDENTIALS", False),
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "Cache-Control"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 
@@ -44,7 +44,7 @@ def create_app(config_name: str | None = None) -> Flask:
             response.headers.setdefault("Vary", "Origin")
             response.headers.setdefault(
                 "Access-Control-Allow-Headers",
-                "Authorization, Content-Type",
+                "Authorization, Content-Type, Cache-Control",
             )
             response.headers.setdefault(
                 "Access-Control-Allow-Methods",

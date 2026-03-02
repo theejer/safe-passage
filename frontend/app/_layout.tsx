@@ -1,5 +1,7 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
+import { View } from "react-native";
+import { ConnectivityBanner } from "@/shared/components/ConnectivityBanner";
 import { useOnlineStatus } from "@/shared/hooks/useOnlineStatus";
 import {
   registerHeartbeatTask,
@@ -25,5 +27,12 @@ export default function RootLayout() {
     void replayQueuedHeartbeats();
   }, [isOnline]);
 
-  return <Stack screenOptions={{ headerTitleAlign: "center" }} />;
+  return (
+    <View style={{ flex: 1 }}>
+      <ConnectivityBanner />
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerTitleAlign: "center" }} />
+      </View>
+    </View>
+  );
 }

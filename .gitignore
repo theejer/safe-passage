@@ -46,6 +46,8 @@ frontend/expo-env.d.ts
 # -----------------------------
 # Backend (Python / Flask)
 # -----------------------------
+.venv/
+venv/
 backend/.venv/
 backend/venv/
 backend/__pycache__/

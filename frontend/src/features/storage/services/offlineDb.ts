@@ -507,11 +507,12 @@ export async function getPendingSyncJobs(limit = 50) {
     `
       SELECT id, entity_type, entity_id, operation, payload_json, attempts, status, next_retry_at, created_at
       FROM sync_queue
-      WHERE status IN ('pending', 'failed')
+      WHERE status = 'pending'
+         OR (status = 'failed' AND (next_retry_at IS NULL OR next_retry_at <= ?))
       ORDER BY created_at ASC
       LIMIT ?
     `,
-    [limit]
+    [nowIso(), limit]
   );
 }
 
