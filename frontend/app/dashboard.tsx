@@ -1,4 +1,4 @@
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -43,7 +43,7 @@ function DashboardTripActions({ tripId }: { tripId: string }) {
 
       const report = await analyzeTripRisk(tripId, days);
       Alert.alert("Score ready", report.summary || "Risk analysis completed.");
-      router.push(`/trips/${tripId}/risk`);
+      router.replace(`/trips/${tripId}/risk`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to generate score";
       Alert.alert("Score generation failed", message);
@@ -54,12 +54,16 @@ function DashboardTripActions({ tripId }: { tripId: string }) {
 
   return (
     <View style={{ flexDirection: "row", gap: 12, flexWrap: "wrap" }}>
-      <Link href={`/trips/${tripId}`}>View Trip</Link>
-      <Link href={`/trips/${tripId}/edit`}>Edit Trip</Link>
-      <TouchableOpacity onPress={() => void onGenerateScore()} disabled={generatingScore}>
-        <Text style={{ color: "#2563eb" }}>{generatingScore ? "Generating Score..." : "Generate Score"}</Text>
-      </TouchableOpacity>
-      <Link href={`/trips/${tripId}/risk`}>Open Risk</Link>
+      <Button variant="secondary" size="sm" block={false} onPress={() => router.push(`/trips/${tripId}`)}>
+        View / Edit Trip
+      </Button>
+      <Button variant="outline" size="sm" block={false} onPress={() => void onGenerateScore()} disabled={generatingScore}>
+        {generatingScore ? "Generating score..." : "Generate Score"}
+      </Button>
+      <Button variant="outline" size="sm" block={false} onPress={() => router.replace(`/trips/${tripId}/risk`)}>
+        Open Risk
+      </Button>
+      {statusMessage ? <Text style={{ color: "#6b7280" }}>{statusMessage}</Text> : null}
     </View>
   );
 }

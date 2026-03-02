@@ -56,7 +56,8 @@ def test_patch_emergency_contact_route_returns_updated_user(monkeypatch):
             "emergency_contact": {
                 "name": payload["name"],
                 "phone": payload["phone"],
-                "email": payload.get("email"),
+                "telegram_chat_id": None,
+                "telegram_bot_active": False,
             },
         }
 
@@ -68,7 +69,6 @@ def test_patch_emergency_contact_route_returns_updated_user(monkeypatch):
         json={
             "name": "Ravi",
             "phone": "+919100000001",
-            "email": "ravi@example.com",
         },
     )
 

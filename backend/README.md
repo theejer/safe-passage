@@ -79,11 +79,17 @@ $env:ANTHROPIC_API_KEY=""
 $env:TWILIO_ACCOUNT_SID=""
 $env:TWILIO_AUTH_TOKEN=""
 $env:TWILIO_FROM_NUMBER=""
+$env:TELEGRAM_BOT_TOKEN=""
+$env:TELEGRAM_BOT_ENABLED="0"
+$env:TELEGRAM_POLL_INTERVAL_SECONDS="2"
 
 # Heartbeat watchdog scheduling
 $env:ENABLE_HEARTBEAT_SCHEDULER="0"
 $env:HEARTBEAT_WATCHDOG_INTERVAL_MINUTES="5"
 $env:HEARTBEAT_WATCHDOG_KEY=""
+
+# Demo-only heartbeat auth fallback (non-production only)
+$env:HEARTBEAT_DEMO_AUTH_FALLBACK="0"
 ```
 
 ## Run the Backend
@@ -106,6 +112,56 @@ $env:FLASK_APP="wsgi.py"
 flask run --host 0.0.0.0 --port 5000
 ```
 
+## Run with Docker (Recommended for GitHub reviewers)
+
+From repo root:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
+
+Edit `backend/.env` and set at least:
+
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `OPENAI_API_KEY` (if using AI itinerary/risk features)
+
+Then start the backend container:
+
+```powershell
+docker compose up --build backend
+```
+
+Healthcheck:
+
+- `GET http://localhost:5000/health`
+
+Run in detached mode:
+
+```powershell
+docker compose up --build -d backend
+```
+
+Stop container:
+
+```powershell
+docker compose down
+```
+
+PowerShell helper script from repo root:
+
+```powershell
+./scripts/backend-docker.ps1 -Action up
+./scripts/backend-docker.ps1 -Action logs
+./scripts/backend-docker.ps1 -Action status
+./scripts/backend-docker.ps1 -Action down
+```
+
+Notes:
+
+- `docker-compose.yml` persists local sqlite data in a named volume (`safepassage_data`).
+- Compose defaults `APP_CONFIG=production` and disables heartbeat scheduler unless enabled in env.
+
 ## Useful Commands
 
 ### Syntax sanity check
@@ -118,6 +174,22 @@ flask run --host 0.0.0.0 --port 5000
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest tests -q
+```
+
+### Run end-to-end smoke flow (API + DB)
+
+```powershell
+.\.venv\Scripts\python.exe tools\smoke_user_flow.py --base-url http://127.0.0.1:5000 --cleanup
+```
+
+Heartbeat mode options:
+
+```powershell
+# Expect auth-enforced heartbeat (401)
+.\.venv\Scripts\python.exe tools\smoke_user_flow.py --heartbeat-check auth
+
+# Expect demo fallback ingest (204) when HEARTBEAT_DEMO_AUTH_FALLBACK=1
+.\.venv\Scripts\python.exe tools\smoke_user_flow.py --heartbeat-check demo
 ```
 
 ### Run one test file
@@ -150,9 +222,10 @@ flask run --host 0.0.0.0 --port 5000
 - `GET /trips/<trip_id>/itinerary`
 - `POST /itinerary/analyze`
 - `POST /itinerary/analyze-pipeline`
-- `POST /heartbeat` (JWT required, returns 204)
+- `POST /heartbeat` (JWT required; in non-production, optional demo fallback when `HEARTBEAT_DEMO_AUTH_FALLBACK=1`)
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
+- `POST /incidents/sync`
 
 ## Focused Guides
 
@@ -161,5 +234,7 @@ flask run --host 0.0.0.0 --port 5000
 ## Notes
 
 - This backend is scaffold-first: routes/services/models are intentionally minimal with comments for fast agentic iteration.
-- Some integrations are placeholders (Twilio/FCM/email dispatch logic is stubbed).
+- Telegram emergency alerting is supported via bot polling (`/start` + phone number activation).
+- Some integrations remain placeholders (SMS/FCM/email dispatch logic is stubbed).
+- Persistence guardrail: direct Supabase SDK table writes are blocked by tests; DB writes should flow through SQLAlchemy-backed model helpers.
 - For production, add auth hardening, request rate limits, and encrypted handling for sensitive location/incident data.

@@ -33,9 +33,15 @@ class BaseConfig:
     TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
 
+    TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_BOT_ENABLED = os.getenv("TELEGRAM_BOT_ENABLED", "0") == "1"
+    TELEGRAM_POLL_INTERVAL_SECONDS = int(os.getenv("TELEGRAM_POLL_INTERVAL_SECONDS", "2"))
+
     ENABLE_HEARTBEAT_SCHEDULER = os.getenv("ENABLE_HEARTBEAT_SCHEDULER", "0") == "1"
-    HEARTBEAT_WATCHDOG_INTERVAL_MINUTES = int(os.getenv("HEARTBEAT_WATCHDOG_INTERVAL_MINUTES", "5"))
+    HEARTBEAT_WATCHDOG_INTERVAL_MINUTES = int(os.getenv("HEARTBEAT_WATCHDOG_INTERVAL_MINUTES", "1"))
     HEARTBEAT_WATCHDOG_KEY = os.getenv("HEARTBEAT_WATCHDOG_KEY", "")
+    HEARTBEAT_FORCE_STAGE_1_TEST_MODE = os.getenv("HEARTBEAT_FORCE_STAGE_1_TEST_MODE", "0") == "1"
+    HEARTBEAT_DEMO_AUTH_FALLBACK = os.getenv("HEARTBEAT_DEMO_AUTH_FALLBACK", "0") == "1"
 
     _cors_origins = os.getenv("CORS_ORIGINS") or os.getenv("ALLOWED_ORIGINS", "*")
     CORS_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()] or ["*"]

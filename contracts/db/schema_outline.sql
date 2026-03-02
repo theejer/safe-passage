@@ -1,5 +1,5 @@
 -- SafePassage Schema Outline (PostgreSQL / Supabase)
--- Contract version: 1.0.0
+-- Contract version: 2.0.0
 -- NOTE: This is a blueprint for integration planning, not a production migration.
 
 -- =====================================
@@ -18,20 +18,9 @@ create table if not exists emergency_contacts (
   user_id uuid not null references users(id) on delete cascade,
   name text not null,
   phone text not null,
-  email text,
-  relationship text,
-  is_primary boolean not null default false,
+  telegram_chat_id text,
+  telegram_bot_active boolean not null default false,
   created_at timestamptz not null default now()
-);
-
-create table if not exists devices (
-  id uuid primary key,
-  user_id uuid not null references users(id) on delete cascade,
-  platform text not null,
-  app_version text not null,
-  push_token text,
-  locale text,
-  last_seen_at timestamptz
 );
 
 -- =====================================
@@ -43,6 +32,7 @@ create table if not exists trips (
   title text not null,
   start_date date not null,
   end_date date not null,
+  destination_country text,
   heartbeat_enabled boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -57,46 +47,106 @@ create table if not exists itineraries (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists itinerary_segments (
+create table if not exists itinerary_days (
   id uuid primary key,
   trip_id uuid not null references trips(id) on delete cascade,
-  segment_order integer not null,
-  segment_label text,
-  start_place text,
-  end_place text,
-  expected_offline_minutes integer not null check (expected_offline_minutes >= 0),
-  connectivity_risk text,
-  day_of_week integer,
-  start_time_local time,
-  end_time_local time,
+  day_id text,
+  day_order integer not null,
+  day_date date,
+  label text,
+  day_notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create table if not exists risk_reports (
+create table if not exists itinerary_locations (
   id uuid primary key,
-  trip_id uuid not null references trips(id) on delete cascade,
-  report jsonb not null,
-  summary text,
-  created_at timestamptz not null default now()
+  day_id uuid not null references itinerary_days(id) on delete cascade,
+  location_id text,
+  location_order integer not null,
+  location_type text not null,
+  name text,
+  raw_text text,
+  address_city text,
+  address_state text,
+  address_country text,
+  geo_lat double precision,
+  geo_lng double precision,
+  geo_source text,
+  start_local timestamptz,
+  end_local timestamptz,
+  timezone text,
+  transport_mode text,
+  transport_from_name text,
+  transport_to_name text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
-create table if not exists connectivity_forecasts (
+create table if not exists itinerary_accommodations (
   id uuid primary key,
-  trip_id uuid not null references trips(id) on delete cascade,
-  day_date date not null,
-  location_name text not null,
-  expected_offline_minutes integer not null check (expected_offline_minutes >= 0),
-  confidence numeric(5,2),
-  created_at timestamptz not null default now()
+  day_id uuid not null unique references itinerary_days(id) on delete cascade,
+  accom_id text,
+  name text,
+  raw_text text,
+  address_line1 text,
+  address_line2 text,
+  address_city text,
+  address_state text,
+  address_country text,
+  address_postal_code text,
+  geo_lat double precision,
+  geo_lng double precision,
+  geo_source text,
+  checkin_local timestamptz,
+  checkout_local timestamptz,
+  timezone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
-create table if not exists risk_recommendations (
+create table if not exists itinerary_risk_queries (
   id uuid primary key,
   trip_id uuid not null references trips(id) on delete cascade,
+  day_id uuid references itinerary_days(id) on delete cascade,
+  location_ref_id uuid references itinerary_locations(id) on delete cascade,
+  accommodation_ref_id uuid references itinerary_accommodations(id) on delete cascade,
+  place_keywords jsonb not null default '[]'::jsonb,
+  country_code text,
+  state text,
+  district text,
+  nearest_city text,
+  lat double precision,
+  lng double precision,
+  is_overnight boolean not null default false,
+  created_at timestamptz not null default now(),
+  check (
+    (location_ref_id is not null and accommodation_ref_id is null)
+    or (location_ref_id is null and accommodation_ref_id is not null)
+  )
+);
+
+create table if not exists itinerary_risks (
+  id uuid primary key,
+  trip_id uuid not null references trips(id) on delete cascade,
+  day_id uuid references itinerary_days(id) on delete cascade,
+  location_ref_id uuid references itinerary_locations(id) on delete cascade,
+  accommodation_ref_id uuid references itinerary_accommodations(id) on delete cascade,
+  category text not null,
+  risk_level text,
   recommendation text not null,
-  priority text not null,
-  created_at timestamptz not null default now()
+  source text,
+  confidence numeric(5,2),
+  connectivity_risk text,
+  expected_offline_minutes integer check (expected_offline_minutes >= 0),
+  connectivity_confidence numeric(5,2),
+  connectivity_notes text,
+  created_at timestamptz not null default now(),
+  check (
+    (location_ref_id is not null and accommodation_ref_id is null)
+    or (location_ref_id is null and accommodation_ref_id is not null)
+    or (location_ref_id is null and accommodation_ref_id is null)
+  )
 );
 
 -- =====================================
@@ -129,7 +179,7 @@ create table if not exists traveler_status (
   last_network_status text,
   location_risk text,
   connectivity_risk text,
-  current_segment_id uuid,
+  current_location_ref_id uuid references itinerary_locations(id) on delete set null,
   current_stage text not null default 'none',
   monitoring_state text not null default 'active',
   last_stage_change_at timestamptz,
@@ -159,17 +209,6 @@ create table if not exists alert_events (
   created_at timestamptz not null default now()
 );
 
-create table if not exists alert_deliveries (
-  id uuid primary key,
-  alert_id uuid not null references alert_events(id) on delete cascade,
-  channel text not null,
-  destination text not null,
-  status text not null,
-  provider_message_id text,
-  delivered_at timestamptz,
-  created_at timestamptz not null default now()
-);
-
 -- =====================================
 -- MITIGATION
 -- =====================================
@@ -179,14 +218,6 @@ create table if not exists emergency_protocol_versions (
   version text not null,
   protocol_json jsonb not null,
   is_active boolean not null default true,
-  created_at timestamptz not null default now()
-);
-
-create table if not exists phrase_packs (
-  id uuid primary key,
-  locale text not null,
-  pack_name text not null,
-  phrases_json jsonb not null,
   created_at timestamptz not null default now()
 );
 
@@ -231,8 +262,11 @@ create table if not exists incident_sync_jobs (
 -- Index Suggestions
 -- =====================================
 create index if not exists idx_trips_user_id on trips(user_id);
-create index if not exists idx_itinerary_segments_trip_order on itinerary_segments(trip_id, segment_order);
+create index if not exists idx_trips_destination_country on trips(destination_country);
+create index if not exists idx_itinerary_days_trip_order on itinerary_days(trip_id, day_order);
+create index if not exists idx_itinerary_locations_day_order on itinerary_locations(day_id, location_order);
+create index if not exists idx_itinerary_risk_queries_trip on itinerary_risk_queries(trip_id, day_id);
+create index if not exists idx_itinerary_risks_trip_category on itinerary_risks(trip_id, category);
 create index if not exists idx_heartbeats_user_time on heartbeats(user_id, timestamp desc);
 create index if not exists idx_traveler_status_trip_stage on traveler_status(trip_id, current_stage);
-create index if not exists idx_risk_reports_trip_time on risk_reports(trip_id, created_at desc);
 create index if not exists idx_incidents_user_sync_status on incidents(user_id, sync_status);

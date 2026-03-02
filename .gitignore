@@ -46,6 +46,10 @@ frontend/expo-env.d.ts
 # -----------------------------
 # Backend (Python / Flask)
 # -----------------------------
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
 backend/.venv/
 backend/venv/
 backend/__pycache__/
@@ -55,6 +59,12 @@ backend/.mypy_cache/
 backend/.ruff_cache/
 backend/.coverage
 backend/htmlcov/
+
+# Telegram bot local Python artifacts
+telegram-bot/.venv/
+telegram-bot/venv/
+telegram-bot/__pycache__/
+telegram-bot/**/*.py[cod]
 
 # -----------------------------
 # Optional local databases / artifacts

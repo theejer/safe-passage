@@ -1,0 +1,4 @@
+requests==2.32.3
+SQLAlchemy==2.0.38
+psycopg2-binary==2.9.11,<3
+python-dotenv==1.0.1

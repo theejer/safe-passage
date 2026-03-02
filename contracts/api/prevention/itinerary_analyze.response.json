@@ -1,41 +1,65 @@
+
 {
-  "contract_version": "1.0.0",
-  "request_id": "req_01JANALYZE",
-  "report": {
-    "summary": "Rural Aurangabad segment has elevated connectivity risk with late-evening travel caution.",
-    "days": [
-      {
-        "date": "2026-04-02",
-        "locations": [
-          {
-            "name": "Bodh Gaya",
-            "location_risk": "moderate",
-            "connectivity_risk": "low",
-            "expected_offline_minutes": 20
-          }
-        ]
-      },
-      {
-        "date": "2026-04-04",
-        "locations": [
-          {
-            "name": "Waterfall Trail",
-            "location_risk": "high",
-            "connectivity_risk": "severe",
-            "expected_offline_minutes": 180
-          }
-        ]
-      }
-    ],
-    "recommendations": [
-      "Avoid this route after 19:00 local time.",
-      "Download Aurangabad offline maps and phrase pack.",
-      "Share ETA with emergency contact before no-signal segment."
-    ]
-  },
-  "saved": {
-    "id": "rpt_43cccb56-b1aa-4e6b-a5cd-b5f41285fdb3",
-    "trip_id": "trp_2aeb3d2e-17db-4ce7-91f2-f01f0a2b0d44",
-    "created_at": "2026-03-01T12:30:00Z"
-  }
+    "trip": {
+        "trip_id": "temp-uuid",
+        "title": null,
+        "start_date": null,
+        "end_date": null,
+        "destination_country": null,
+        "days": [
+            {
+                "day_id": "day-1",
+                "date": null,
+                "label": "Day 1",
+                "day_notes": null,
+                "locations": [
+                    {
+                        "location_id": "loc-1",
+                        "type": "visit",
+                        "name": null,
+                        "raw_text": null,
+                        "address": {"city": null, "state": null, "country": null},
+                        "geo": {"lat": null, "lng": null, "source": null},
+                        "time": {"start_local": null, "end_local": null, "timezone": null},
+                        "transport": {"mode": null, "from_name": null, "to_name": null},
+                        "risk_queries": {
+                            "place_keywords": [],
+                            "country_code": null,
+                            "state": null,
+                            "district": null,
+                            "nearest_city": null,
+                            "lat": null,
+                            "lng": null,
+                            "is_overnight": false,
+                        },
+                    }
+                ],
+                "accommodation": {
+                    "accom_id": null,
+                    "name": null,
+                    "raw_text": null,
+                    "address": {
+                        "line1": null,
+                        "line2": null,
+                        "city": null,
+                        "state": null,
+                        "country": null,
+                        "postal_code": null,
+                    },
+                    "geo": {"lat": null, "lng": null, "source": null},
+                    "time": {"checkin_local": null, "checkout_local": null, "timezone": null},
+                    "risk_queries": {
+                        "place_keywords": [],
+                        "country_code": null,
+                        "state": null,
+                        "district": null,
+                        "nearest_city": null,
+                        "lat": null,
+                        "lng": null,
+                        "is_overnight": true,
+                    },
+                },
+            }
+        ],
+    }
 }

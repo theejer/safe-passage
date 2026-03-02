@@ -1,13 +1,54 @@
 import { useState } from "react";
 import {
+  deleteItineraryByTripId,
+  deleteTripById,
   getPendingSyncJobs,
   initializeOfflineDb,
   markSyncJobDone,
   markSyncJobFailed,
   type SyncQueueJob,
 } from "@/features/storage/services/offlineDb";
+import { replayHeartbeatSyncJob } from "@/features/heartbeat/services/heartbeatApi";
+import { replayTripSyncJob } from "@/features/trips/services/tripsApi";
+import { replayItinerarySyncJob } from "@/features/trips/services/itineraryApi";
+import { replayIncidentSyncJob } from "@/features/emergency/services/emergencyApi";
+import { replayEmergencyContactSyncJob, replayUserSyncJob } from "@/features/user/services/userApi";
 
 type SyncProcessor = (job: SyncQueueJob) => Promise<void>;
+
+async function processSyncJob(job: SyncQueueJob) {
+  if (job.entity_type === "heartbeat") {
+    await replayHeartbeatSyncJob(job);
+    return;
+  }
+
+  if (job.entity_type === "trip") {
+    await replayTripSyncJob(job);
+    return;
+  }
+
+  if (job.entity_type === "itinerary") {
+    await replayItinerarySyncJob(job);
+    return;
+  }
+
+  if (job.entity_type === "incident_sync") {
+    await replayIncidentSyncJob(job);
+    return;
+  }
+
+  if (job.entity_type === "user") {
+    await replayUserSyncJob(job);
+    return;
+  }
+
+  if (job.entity_type === "emergency_contact") {
+    await replayEmergencyContactSyncJob(job);
+    return;
+  }
+
+  throw new Error(`unsupported sync job entity type: ${job.entity_type}`);
+}
 
 export function useOfflineSync() {
   // Coordinates queue replay when online state returns.
@@ -29,12 +70,24 @@ export function useOfflineSync() {
 
       for (const job of jobs) {
         try {
-          if (processor) {
-            await processor(job);
-          }
+          await (processor ?? processSyncJob)(job);
           await markSyncJobDone(job.id);
           succeeded += 1;
         } catch {
+          if (job.entity_type === "trip") {
+            await deleteTripById(job.entity_id);
+            await markSyncJobDone(job.id);
+            failed += 1;
+            continue;
+          }
+
+          if (job.entity_type === "itinerary") {
+            await deleteItineraryByTripId(job.entity_id);
+            await markSyncJobDone(job.id);
+            failed += 1;
+            continue;
+          }
+
           await markSyncJobFailed(job.id, job.attempts + 1);
           failed += 1;
         }

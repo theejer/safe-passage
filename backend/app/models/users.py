@@ -18,13 +18,26 @@ def _is_uuid(value: str) -> bool:
         return False
 
 
+def _normalize_phone(value: str | None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+
+    keep_plus = raw.startswith("+")
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        return ""
+
+    return f"+{digits}" if keep_plus else digits
+
+
 def _attach_primary_emergency_contact(user_row: dict) -> dict:
     query = text(
         """
-        SELECT name, phone, email
+        SELECT name, phone, telegram_chat_id, telegram_bot_active
         FROM emergency_contacts
         WHERE user_id = :user_id
-        ORDER BY is_primary DESC, created_at DESC
+        ORDER BY created_at DESC
         LIMIT 1
         """
     )
@@ -36,7 +49,8 @@ def _attach_primary_emergency_contact(user_row: dict) -> dict:
         user_row["emergency_contact"] = {
             "name": contact_row.get("name"),
             "phone": contact_row.get("phone"),
-            "email": contact_row.get("email"),
+            "telegram_chat_id": contact_row.get("telegram_chat_id"),
+            "telegram_bot_active": bool(contact_row.get("telegram_bot_active")),
         }
 
     return user_row
@@ -44,7 +58,8 @@ def _attach_primary_emergency_contact(user_row: dict) -> dict:
 
 def create_user(payload: dict) -> dict:
     """Insert user record and return created row metadata."""
-    user_id = str(uuid4())
+    candidate_id = str(payload.get("id") or "").strip()
+    user_id = candidate_id if _is_uuid(candidate_id) else str(uuid4())
 
     insert_user_query = text(
         """
@@ -56,8 +71,7 @@ def create_user(payload: dict) -> dict:
 
     emergency_contact = payload.get("emergency_contact") or {}
     emergency_name = (emergency_contact.get("name") or "").strip()
-    emergency_phone = (emergency_contact.get("phone") or "").strip()
-    emergency_email = emergency_contact.get("email")
+    emergency_phone = _normalize_phone(emergency_contact.get("phone"))
 
     with get_db_engine().begin() as connection:
         user_row = connection.execute(
@@ -72,8 +86,8 @@ def create_user(payload: dict) -> dict:
         if emergency_name and emergency_phone:
             insert_contact_query = text(
                 """
-                INSERT INTO emergency_contacts (id, user_id, name, phone, email, is_primary)
-                VALUES (:id, :user_id, :name, :phone, :email, TRUE)
+                INSERT INTO emergency_contacts (id, user_id, name, phone, telegram_chat_id, telegram_bot_active)
+                VALUES (:id, :user_id, :name, :phone, NULL, FALSE)
                 """
             )
             connection.execute(
@@ -83,7 +97,6 @@ def create_user(payload: dict) -> dict:
                     "user_id": user_id,
                     "name": emergency_name,
                     "phone": emergency_phone,
-                    "email": emergency_email,
                 },
             )
 
@@ -114,8 +127,7 @@ def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
         return {}
 
     name = (contact_payload.get("name") or "").strip()
-    phone = (contact_payload.get("phone") or "").strip()
-    email = contact_payload.get("email")
+    phone = _normalize_phone(contact_payload.get("phone"))
     if not name or not phone:
         return get_user_by_id(user_id)
 
@@ -126,7 +138,7 @@ def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
                 SELECT id
                 FROM emergency_contacts
                 WHERE user_id = :user_id
-                ORDER BY is_primary DESC, created_at DESC
+                ORDER BY created_at DESC
                 LIMIT 1
                 """
             ),
@@ -140,8 +152,8 @@ def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
                     UPDATE emergency_contacts
                     SET name = :name,
                         phone = :phone,
-                        email = :email,
-                        is_primary = TRUE
+                        telegram_chat_id = NULL,
+                        telegram_bot_active = FALSE
                     WHERE id = :contact_id
                     """
                 ),
@@ -149,15 +161,14 @@ def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
                     "contact_id": existing_primary["id"],
                     "name": name,
                     "phone": phone,
-                    "email": email,
                 },
             )
         else:
             connection.execute(
                 text(
                     """
-                    INSERT INTO emergency_contacts (id, user_id, name, phone, email, is_primary)
-                    VALUES (:id, :user_id, :name, :phone, :email, TRUE)
+                    INSERT INTO emergency_contacts (id, user_id, name, phone, telegram_chat_id, telegram_bot_active)
+                    VALUES (:id, :user_id, :name, :phone, NULL, FALSE)
                     """
                 ),
                 {
@@ -165,8 +176,89 @@ def update_emergency_contact(user_id: str, contact_payload: dict) -> dict:
                     "user_id": user_id,
                     "name": name,
                     "phone": phone,
-                    "email": email,
                 },
             )
 
     return get_user_by_id(user_id)
+
+
+def activate_telegram_contact_by_phone(phone: str, chat_id: str) -> dict:
+    """Activate Telegram notifications for the latest contact matching phone."""
+    normalized_phone = _normalize_phone(phone)
+    normalized_chat_id = (chat_id or "").strip()
+    if not normalized_phone or not normalized_chat_id:
+        return {}
+
+    with get_db_engine().begin() as connection:
+        contacts = connection.execute(
+            text(
+                """
+                SELECT id, user_id, name, phone
+                FROM emergency_contacts
+                ORDER BY created_at DESC
+                """
+            )
+        ).mappings().all()
+
+        matched = next(
+            (
+                row
+                for row in contacts
+                if _normalize_phone(row.get("phone")) == normalized_phone
+            ),
+            None,
+        )
+        if not matched:
+            return {}
+
+        connection.execute(
+            text(
+                """
+                UPDATE emergency_contacts
+                SET telegram_chat_id = :chat_id,
+                    telegram_bot_active = TRUE
+                WHERE id = :contact_id
+                """
+            ),
+            {"contact_id": matched["id"], "chat_id": normalized_chat_id},
+        )
+
+    return {
+        "id": matched.get("id"),
+        "user_id": matched.get("user_id"),
+        "name": matched.get("name"),
+        "phone": matched.get("phone"),
+        "telegram_chat_id": normalized_chat_id,
+        "telegram_bot_active": True,
+    }
+
+
+def get_emergency_contact_context_by_chat_id(chat_id: str) -> dict:
+    """Resolve emergency contact and traveler context for an activated Telegram chat id."""
+    normalized_chat_id = (chat_id or "").strip()
+    if not normalized_chat_id:
+        return {}
+
+    query = text(
+        """
+        SELECT
+            ec.id AS contact_id,
+            ec.user_id,
+            ec.name AS contact_name,
+            ec.phone AS contact_phone,
+            ec.telegram_chat_id,
+            ec.telegram_bot_active,
+            u.full_name AS traveler_name
+        FROM emergency_contacts ec
+        JOIN users u ON u.id = ec.user_id
+        WHERE ec.telegram_chat_id = :chat_id
+          AND ec.telegram_bot_active = TRUE
+        ORDER BY ec.created_at DESC
+        LIMIT 1
+        """
+    )
+
+    with get_db_engine().begin() as connection:
+        row = connection.execute(query, {"chat_id": normalized_chat_id}).mappings().first()
+
+    return dict(row) if row else {}

@@ -19,9 +19,12 @@ Primary goals:
 SQLite schema currently includes:
 - `metadata` (key/value app metadata)
 - `trips`
+- `user_profiles`
+- `emergency_contacts`
 - `itinerary_days`
 - `itinerary_locations`
 - `risk_reports` (cached risk snapshot JSON)
+- `heartbeat_journal`
 - `incidents`
 - `incident_attachments`
 - `sync_queue`
@@ -84,6 +87,23 @@ getLatestRiskReport(tripId)
 - Stores JSON payload in `risk_reports.report_json`.
 - Used as PREVENTION fallback when network risk endpoint fails.
 
+### User + Contact
+
+```ts
+upsertUserProfile(profile)
+getUserProfile(userId)
+upsertEmergencyContact(contact)
+getEmergencyContactByUserId(userId)
+```
+
+### Heartbeat Journal
+
+```ts
+upsertHeartbeatJournal(heartbeat)
+listRecentHeartbeatJournal(userId, tripId, limit?)
+markHeartbeatJournalSynced(heartbeatId)
+```
+
 ### Incidents
 
 ```ts
@@ -136,6 +156,7 @@ await runSync(async (job) => {
 Expected usage:
 - Trigger on reconnect (`useOnlineStatus`) or manual debug action.
 - Keep processor deterministic and idempotent.
+- If no custom processor is passed, built-in routing handles `user`, `emergency_contact`, `trip`, `itinerary`, `heartbeat`, and `incident_sync` jobs.
 
 ## Testing
 

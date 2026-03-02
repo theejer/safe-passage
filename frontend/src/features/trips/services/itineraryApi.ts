@@ -1,9 +1,11 @@
 import { apiClient } from "@/lib/apiClient";
+import NetInfo from "@react-native-community/netinfo";
 import type { Day } from "@/features/trips/types";
 import {
   enqueueSyncJob,
   getItinerary,
   initializeOfflineDb,
+  type SyncQueueJob,
   upsertItinerary as upsertLocalItinerary,
 } from "@/features/storage/services/offlineDb";
 import { canSyncItineraryOnline } from "@/shared/utils/syncGuards";
@@ -69,27 +71,53 @@ function fromWireDays(days: DayWireFlexible[]): Day[] {
   }));
 }
 
+async function isDeviceOffline() {
+  try {
+    const net = await NetInfo.fetch();
+    const connected = Boolean(net.isConnected) && Boolean(net.isInternetReachable ?? true);
+    return !connected;
+  } catch {
+    return false;
+  }
+}
+
 // Routes itinerary JSON to backend and fetches latest snapshot.
 export async function upsertItinerary(tripId: string, days: Day[]) {
   await initializeOfflineDb();
-  await upsertLocalItinerary(tripId, days);
 
   const wireDays = toWireDays(days);
 
-  if (!canSyncItineraryOnline(tripId)) {
-    return { trip_id: tripId, days: wireDays, meta: { saved: false, local_only: true } };
-  }
+  // Always write to SQLite first
+  await upsertLocalItinerary(tripId, days);
 
-  try {
-    return await apiClient.put(`/trips/${tripId}/itinerary`, { days: wireDays, meta: {} });
-  } catch {
+  // Then attempt to sync remotely
+  if (canSyncItineraryOnline(tripId)) {
+    try {
+      const response = (await apiClient.put(`/trips/${tripId}/itinerary`, { days: wireDays, meta: {} })) as {
+        days?: DayWire[];
+      };
+      // Update with server response if successful
+      await upsertLocalItinerary(tripId, fromWireDays(response.days ?? wireDays));
+      return response;
+    } catch {
+      // If remote sync fails, queue for retry
+      await enqueueSyncJob({
+        entityType: "itinerary",
+        entityId: tripId,
+        operation: "upsert",
+        payload: { trip_id: tripId, days: wireDays, meta: {} },
+      });
+      return { trip_id: tripId, days: wireDays, meta: { saved: false, local_only: true } };
+    }
+  } else {
+    // No trip context or offline; queue for later
     await enqueueSyncJob({
       entityType: "itinerary",
       entityId: tripId,
       operation: "upsert",
       payload: { trip_id: tripId, days: wireDays, meta: {} },
     });
-    return { trip_id: tripId, days: wireDays, meta: {} };
+    return { trip_id: tripId, days: wireDays, meta: { saved: false, local_only: true } };
   }
 }
 
@@ -126,4 +154,19 @@ export async function uploadItineraryPDF(formData: FormData) {
 
   const result = (await response.json()) as { days?: DayWireFlexible[] };
   return fromWireDays(result.days ?? []);
+}
+
+export async function replayItinerarySyncJob(job: SyncQueueJob) {
+  if (job.entity_type !== "itinerary") {
+    throw new Error(`unsupported sync job entity type: ${job.entity_type}`);
+  }
+
+  const payload = JSON.parse(job.payload_json) as { trip_id?: string; days?: DayWire[]; meta?: Record<string, unknown> };
+  const tripId = String(payload.trip_id ?? job.entity_id);
+  const response = (await apiClient.put(`/trips/${tripId}/itinerary`, {
+    days: payload.days ?? [],
+    meta: payload.meta ?? {},
+  })) as { days?: DayWire[] };
+
+  await upsertLocalItinerary(tripId, fromWireDays(response.days ?? payload.days ?? []));
 }

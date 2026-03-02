@@ -4,6 +4,7 @@ import {
   initializeOfflineDb,
   markIncidentSynced,
   upsertIncident,
+  type SyncQueueJob,
 } from "@/features/storage/services/offlineDb";
 import type { ScenarioKey } from "@/features/emergency/types";
 
@@ -64,5 +65,19 @@ export async function syncIncident(payload: Record<string, unknown>) {
       sync_status: "queued",
       queued_count: incidents.length,
     };
+  }
+}
+
+export async function replayIncidentSyncJob(job: SyncQueueJob) {
+  if (job.entity_type !== "incident_sync") {
+    throw new Error(`unsupported sync job entity type: ${job.entity_type}`);
+  }
+
+  const payload = JSON.parse(job.payload_json) as Record<string, unknown>;
+  const incidents = parseIncidentPayload(payload);
+  await apiClient.post("/incidents/sync", payload);
+
+  for (const incident of incidents) {
+    await markIncidentSynced(incident.incident_id);
   }
 }

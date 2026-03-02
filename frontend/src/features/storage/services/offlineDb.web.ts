@@ -2,7 +2,7 @@ import type { ScenarioKey } from "@/features/emergency/types";
 import type { RiskReport } from "@/features/risk/types";
 import type { Day, Trip } from "@/features/trips/types";
 
-const SCHEMA_VERSION = "1";
+const SCHEMA_VERSION = "2";
 const WEB_STORE_KEY = "safepassage.web.offline.store.v1";
 
 export type SyncQueueJob = {
@@ -30,6 +30,47 @@ export type LocalIncident = {
   sync_status?: "pending" | "synced" | "failed";
 };
 
+export type LocalUserProfile = {
+  id: string;
+  full_name: string;
+  phone: string;
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+  sync_status?: "pending" | "synced" | "failed";
+};
+
+export type LocalEmergencyContact = {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  telegram_chat_id?: string | null;
+  telegram_bot_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+  sync_status?: "pending" | "synced" | "failed";
+};
+
+export type LocalHeartbeatJournal = {
+  id: string;
+  user_id: string;
+  trip_id: string;
+  timestamp: string;
+  gps_lat?: number;
+  gps_lng?: number;
+  accuracy_meters?: number;
+  battery_percent?: number;
+  network_status: "online" | "offline" | "unknown";
+  offline_minutes?: number;
+  source: string;
+  sync_status?: "pending" | "synced" | "failed";
+  created_at?: string;
+  updated_at?: string;
+  source_version?: number;
+};
+
 type MemoryTripRecord = {
   id: string;
   user_id: string;
@@ -43,6 +84,9 @@ type MemoryStore = {
   initialized: boolean;
   metadata: Map<string, string>;
   trips: Map<string, MemoryTripRecord>;
+  users: Map<string, LocalUserProfile>;
+  emergencyContacts: Map<string, LocalEmergencyContact>;
+  heartbeats: Map<string, LocalHeartbeatJournal>;
   itineraries: Map<string, Day[]>;
   riskReports: Map<string, RiskReport>;
   incidents: Map<string, LocalIncident>;
@@ -74,6 +118,9 @@ function hydrateStoreFromLocalStorage(): MemoryStore | null {
       initialized?: boolean;
       metadata?: Record<string, string>;
       trips?: MemoryTripRecord[];
+      users?: LocalUserProfile[];
+      emergencyContacts?: LocalEmergencyContact[];
+      heartbeats?: LocalHeartbeatJournal[];
       itineraries?: Record<string, Day[]>;
       riskReports?: Record<string, RiskReport>;
       incidents?: LocalIncident[];
@@ -85,6 +132,11 @@ function hydrateStoreFromLocalStorage(): MemoryStore | null {
       initialized: Boolean(parsed.initialized),
       metadata: new Map<string, string>(Object.entries(parsed.metadata ?? {})),
       trips: new Map<string, MemoryTripRecord>((parsed.trips ?? []).map((trip) => [trip.id, trip])),
+      users: new Map<string, LocalUserProfile>((parsed.users ?? []).map((user) => [user.id, user])),
+      emergencyContacts: new Map<string, LocalEmergencyContact>(
+        (parsed.emergencyContacts ?? []).map((contact) => [contact.id, contact])
+      ),
+      heartbeats: new Map<string, LocalHeartbeatJournal>((parsed.heartbeats ?? []).map((heartbeat) => [heartbeat.id, heartbeat])),
       itineraries: new Map<string, Day[]>(Object.entries(parsed.itineraries ?? {})),
       riskReports: new Map<string, RiskReport>(Object.entries(parsed.riskReports ?? {})),
       incidents: new Map<string, LocalIncident>((parsed.incidents ?? []).map((incident) => [incident.id, incident])),
@@ -104,6 +156,9 @@ function persistStoreToLocalStorage(store: MemoryStore) {
       initialized: store.initialized,
       metadata: Object.fromEntries(store.metadata),
       trips: [...store.trips.values()],
+      users: [...store.users.values()],
+      emergencyContacts: [...store.emergencyContacts.values()],
+      heartbeats: [...store.heartbeats.values()],
       itineraries: Object.fromEntries(store.itineraries),
       riskReports: Object.fromEntries(store.riskReports),
       incidents: [...store.incidents.values()],
@@ -122,6 +177,9 @@ function getStore(): MemoryStore {
       initialized: false,
       metadata: new Map<string, string>(),
       trips: new Map<string, MemoryTripRecord>(),
+      users: new Map<string, LocalUserProfile>(),
+      emergencyContacts: new Map<string, LocalEmergencyContact>(),
+      heartbeats: new Map<string, LocalHeartbeatJournal>(),
       itineraries: new Map<string, Day[]>(),
       riskReports: new Map<string, RiskReport>(),
       incidents: new Map<string, LocalIncident>(),
@@ -207,6 +265,20 @@ export async function getTripById(tripId: string) {
   return record ? toTrip(record) : null;
 }
 
+export async function deleteItineraryByTripId(tripId: string) {
+  const store = getStore();
+  store.itineraries.delete(tripId);
+  persistStoreToLocalStorage(store);
+}
+
+export async function deleteTripById(tripId: string) {
+  const store = getStore();
+  store.trips.delete(tripId);
+  store.itineraries.delete(tripId);
+  store.riskReports.delete(tripId);
+  persistStoreToLocalStorage(store);
+}
+
 export async function upsertItinerary(tripId: string, days: Day[]) {
   const store = getStore();
   store.itineraries.set(tripId, clone(days));
@@ -248,6 +320,78 @@ export async function markIncidentSynced(incidentId: string) {
   const existing = store.incidents.get(incidentId);
   if (!existing) return;
   store.incidents.set(incidentId, { ...existing, sync_status: "synced" });
+  persistStoreToLocalStorage(store);
+}
+
+export async function upsertUserProfile(profile: LocalUserProfile) {
+  const store = getStore();
+  const timestamp = nowIso();
+  store.users.set(profile.id, {
+    ...profile,
+    created_at: profile.created_at ?? timestamp,
+    updated_at: profile.updated_at ?? timestamp,
+    source_version: profile.source_version ?? 0,
+    sync_status: profile.sync_status ?? "pending",
+  });
+  persistStoreToLocalStorage(store);
+}
+
+export async function getUserProfile(userId: string) {
+  const store = getStore();
+  const row = store.users.get(userId);
+  return row ? { ...row } : null;
+}
+
+export async function upsertEmergencyContact(contact: LocalEmergencyContact) {
+  const store = getStore();
+  const timestamp = nowIso();
+  store.emergencyContacts.set(contact.id, {
+    ...contact,
+    telegram_bot_active: Boolean(contact.telegram_bot_active),
+    created_at: contact.created_at ?? timestamp,
+    updated_at: contact.updated_at ?? timestamp,
+    source_version: contact.source_version ?? 0,
+    sync_status: contact.sync_status ?? "pending",
+  });
+  persistStoreToLocalStorage(store);
+}
+
+export async function getEmergencyContactByUserId(userId: string) {
+  const store = getStore();
+  const candidates = [...store.emergencyContacts.values()]
+    .filter((contact) => contact.user_id === userId)
+    .sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")));
+  const latest = candidates[0];
+  return latest ? { ...latest } : null;
+}
+
+export async function upsertHeartbeatJournal(heartbeat: LocalHeartbeatJournal) {
+  const store = getStore();
+  const timestamp = nowIso();
+  store.heartbeats.set(heartbeat.id, {
+    ...heartbeat,
+    created_at: heartbeat.created_at ?? timestamp,
+    updated_at: heartbeat.updated_at ?? timestamp,
+    source_version: heartbeat.source_version ?? 0,
+    sync_status: heartbeat.sync_status ?? "pending",
+  });
+  persistStoreToLocalStorage(store);
+}
+
+export async function listRecentHeartbeatJournal(userId: string, tripId: string, limit = 50) {
+  const store = getStore();
+  return [...store.heartbeats.values()]
+    .filter((heartbeat) => heartbeat.user_id === userId && heartbeat.trip_id === tripId)
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+    .slice(0, limit)
+    .map((heartbeat) => ({ ...heartbeat }));
+}
+
+export async function markHeartbeatJournalSynced(heartbeatId: string) {
+  const store = getStore();
+  const existing = store.heartbeats.get(heartbeatId);
+  if (!existing) return;
+  store.heartbeats.set(heartbeatId, { ...existing, sync_status: "synced", updated_at: nowIso() });
   persistStoreToLocalStorage(store);
 }
 

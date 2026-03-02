@@ -1,23 +1,27 @@
 import { useState } from "react";
 import { View, TextInput, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
-import { createTrip } from "@/features/trips/services/tripsApi";
 import { getItem } from "@/features/storage/services/localStore";
+import { userExistsRemotely } from "@/features/user/services/userApi";
+import { isLocalOnlyUserId } from "@/shared/utils/syncGuards";
 import { Button } from "@/shared/components/Button";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 
+type TripMetadata = { userId: string; title: string; startDate: string; endDate: string };
+
 type TripFormProps = { 
   mode: "create" | "edit";
-  onSuccess?: (tripId: string) => void;
+  onMetadataSubmit?: (metadata: TripMetadata) => void;
 };
 
-export function TripForm({ mode, onSuccess }: TripFormProps) {
+export function TripForm({ mode, onMetadataSubmit }: TripFormProps) {
   // Minimal create/edit form scaffold for trip metadata.
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
 
   const formatDateLocal = (date: Date) => {
     const year = date.getFullYear();
@@ -161,15 +165,45 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
   };
 
   async function onSubmit() {
+    setSubmitError(null);
+
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      setSubmitError("Trip title is required.");
+      return;
+    }
+
+    const start = formatDateForAPI(startDate);
+    const end = formatDateForAPI(endDate);
+    if (!start || !end) {
+      setSubmitError("Start date and end date are required.");
+      return;
+    }
+
+    if (start > end) {
+      setSubmitError("End date must be on or after start date.");
+      return;
+    }
+
     if (mode === "create") {
+      const normalizedTitle = title.trim();
+      const normalizedStartDate = formatDateForAPI(startDate);
+      const normalizedEndDate = formatDateForAPI(endDate);
+
+      if (!normalizedTitle || !normalizedStartDate || !normalizedEndDate) {
+        setValidationMessage("Trip title, start date, and end date are required.");
+        return;
+      }
+
+      setValidationMessage(null);
       const activeUserId = (await getItem(ACTIVE_USER_ID_KEY)) ?? "demo-user";
-      const trip = await createTrip({
+      // Don't create trip yet - just return metadata to parent
+      onMetadataSubmit?.({
         userId: activeUserId,
-        title,
-        startDate: formatDateForAPI(startDate),
-        endDate: formatDateForAPI(endDate),
+        title: normalizedTitle,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate,
       });
-      onSuccess?.(trip.id);
     }
   }
 
@@ -210,7 +244,11 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
         onDateChange={setEndDate}
       />
 
-      <Button onPress={() => void onSubmit()}>{mode === "create" ? "Create trip" : "Save changes"}</Button>
+      {validationMessage ? <Text style={{ color: "#b91c1c", fontSize: 13 }}>{validationMessage}</Text> : null}
+
+      <Button onPress={() => void onSubmit()} disabled={!title.trim() || !startDate || !endDate}>
+        {mode === "create" ? "Create trip" : "Save changes"}
+      </Button>
     </ScrollView>
   );
 }

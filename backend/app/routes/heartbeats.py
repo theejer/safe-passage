@@ -9,7 +9,12 @@ from pydantic import ValidationError
 from app.models.heartbeats import insert_heartbeat
 from app.models.trips import get_trip_by_id
 from app.schemas.heartbeat_schema import HeartbeatIngestSchema
-from app.services.heartbeat_monitor import run_watchdog_cycle, process_heartbeat_ingest
+from app.services.heartbeat_monitor import (
+    run_watchdog_cycle,
+    process_heartbeat_ingest,
+    record_stage_1_contact_confirmation,
+    apply_stage_1_contact_response,
+)
 from app.utils.auth import extract_bearer_token, verify_supabase_user_id
 
 heartbeats_bp = Blueprint("heartbeats", __name__)
@@ -19,15 +24,26 @@ heartbeats_bp = Blueprint("heartbeats", __name__)
 def heartbeat_ingest_route():
     """Persist heartbeat ping used by offline anomaly monitor task."""
     try:
-        token = extract_bearer_token(request)
-        auth_user_id = verify_supabase_user_id(token)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 401
-
-    try:
         payload = HeartbeatIngestSchema.model_validate(request.get_json(force=True)).model_dump()
     except ValidationError as exc:
         return jsonify({"error": "invalid heartbeat payload", "details": exc.errors()}), 400
+
+    auth_user_id: str | None = None
+    try:
+        token = extract_bearer_token(request)
+        auth_user_id = verify_supabase_user_id(token)
+    except ValueError as exc:
+        fallback_enabled = bool(current_app.config.get("HEARTBEAT_DEMO_AUTH_FALLBACK", False))
+        is_non_production = str(current_app.config.get("FLASK_ENV", "development")).lower() != "production"
+        if not (fallback_enabled and is_non_production):
+            return jsonify({"error": str(exc)}), 401
+        auth_user_id = str(payload.get("user_id") or "").strip() or None
+        if not auth_user_id:
+            return jsonify({"error": "user_id is required for demo auth fallback"}), 400
+        current_app.logger.warning(
+            "Heartbeat ingest accepted via demo auth fallback for user_id=%s",
+            auth_user_id,
+        )
 
     if payload["user_id"] != auth_user_id:
         return jsonify({"error": "user_id does not match token subject"}), 403
@@ -70,4 +86,71 @@ def heartbeat_watchdog_run_route():
             return jsonify({"error": "invalid watchdog key"}), 401
 
     result = run_watchdog_cycle()
+    return jsonify(result)
+
+
+@heartbeats_bp.post("/watchdog/confirm")
+def heartbeat_watchdog_confirm_route():
+    """Record emergency-contact confirmation for stage-1, enabling stage-2 escalation."""
+    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
+    if watchdog_key:
+        provided = request.headers.get("x-watchdog-key", "")
+        if provided != watchdog_key:
+            return jsonify({"error": "invalid watchdog key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str(payload.get("user_id") or "").strip()
+    trip_id = str(payload.get("trip_id") or "").strip()
+    confirmed = bool(payload.get("confirmed", False))
+    confirmed_by = str(payload.get("confirmed_by") or "").strip()
+    note = payload.get("note")
+
+    if not user_id or not trip_id:
+        return jsonify({"error": "user_id and trip_id are required"}), 400
+    if not confirmed:
+        return jsonify({"error": "confirmed must be true for escalation confirmation"}), 400
+    if not confirmed_by:
+        return jsonify({"error": "confirmed_by is required"}), 400
+
+    result = record_stage_1_contact_confirmation(
+        user_id=user_id,
+        trip_id=trip_id,
+        confirmed_by=confirmed_by,
+        note=str(note) if note is not None else None,
+    )
+    return jsonify(result)
+
+
+@heartbeats_bp.post("/watchdog/respond")
+def heartbeat_watchdog_respond_route():
+    """Apply emergency-contact YES/NO response for a Stage-1 alert."""
+    watchdog_key = current_app.config.get("HEARTBEAT_WATCHDOG_KEY", "")
+    if watchdog_key:
+        provided = request.headers.get("x-watchdog-key", "")
+        if provided != watchdog_key:
+            return jsonify({"error": "invalid watchdog key"}), 401
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str(payload.get("user_id") or "").strip()
+    trip_id = str(payload.get("trip_id") or "").strip()
+    response_text = str(payload.get("response") or "").strip().upper()
+    confirmed_by = str(payload.get("confirmed_by") or "").strip()
+    note = payload.get("note")
+    source = str(payload.get("source") or "telegram").strip() or "telegram"
+
+    if not user_id or not trip_id:
+        return jsonify({"error": "user_id and trip_id are required"}), 400
+    if response_text not in {"YES", "NO"}:
+        return jsonify({"error": "response must be YES or NO"}), 400
+    if not confirmed_by:
+        return jsonify({"error": "confirmed_by is required"}), 400
+
+    result = apply_stage_1_contact_response(
+        user_id=user_id,
+        trip_id=trip_id,
+        can_contact=(response_text == "YES"),
+        confirmed_by=confirmed_by,
+        source=source,
+        note=str(note) if note is not None else None,
+    )
     return jsonify(result)

@@ -6,6 +6,7 @@ call service modules; services may persist data through model wrappers.
 """
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.triggers.interval import IntervalTrigger
 
 from flask import Flask, request
@@ -14,6 +15,7 @@ from flask_cors import CORS
 from app.config import get_config
 from app.extensions import init_extensions
 from app.routes.reports import reports_bp
+from app.services.notifications import start_telegram_bot_poller
 
 def create_app(config_name: str | None = None) -> Flask:
     """Create and configure the Flask application instance.
@@ -29,7 +31,7 @@ def create_app(config_name: str | None = None) -> Flask:
         app,
         resources={r"/*": {"origins": app.config.get("CORS_ORIGINS", ["*"])}},
         supports_credentials=app.config.get("CORS_ALLOW_CREDENTIALS", False),
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "Cache-Control"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 
@@ -42,7 +44,7 @@ def create_app(config_name: str | None = None) -> Flask:
             response.headers.setdefault("Vary", "Origin")
             response.headers.setdefault(
                 "Access-Control-Allow-Headers",
-                "Authorization, Content-Type",
+                "Authorization, Content-Type, Cache-Control",
             )
             response.headers.setdefault(
                 "Access-Control-Allow-Methods",
@@ -58,6 +60,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.routes.trips import trips_bp
     from app.routes.itinerary_analysis import itinerary_analysis_bp
     from app.routes.heartbeats import heartbeats_bp
+    from app.routes.incidents import incidents_bp
     from app.routes.auth import auth_bp
 
     app.register_blueprint(healthcheck_bp)
@@ -69,6 +72,10 @@ def create_app(config_name: str | None = None) -> Flask:
     app.register_blueprint(itinerary_analysis_bp, url_prefix="/itinerary")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeat", name="heartbeat_alias")
     app.register_blueprint(heartbeats_bp, url_prefix="/heartbeats")
+    app.register_blueprint(incidents_bp, url_prefix="/incidents")
+
+    if app.config.get("TELEGRAM_BOT_ENABLED", False):
+        start_telegram_bot_poller(app)
 
     if app.config.get("ENABLE_HEARTBEAT_SCHEDULER", False):
         from app.tasks.monitor_offline import run_watchdog_task
@@ -86,8 +93,31 @@ def create_app(config_name: str | None = None) -> Flask:
             max_instances=1,
             coalesce=True,
         )
+
+        def _format_next_run() -> str:
+            job = scheduler.get_job("heartbeat-watchdog")
+            if not job or not job.next_run_time:
+                return "n/a"
+            return job.next_run_time.isoformat()
+
+        def _on_watchdog_event(event) -> None:
+            if event.job_id != "heartbeat-watchdog":
+                return
+
+            status = "failed" if getattr(event, "exception", None) else "completed"
+            app.logger.info(
+                "Heartbeat watchdog cycle %s; next_run_utc=%s",
+                status,
+                _format_next_run(),
+            )
+
+        scheduler.add_listener(_on_watchdog_event, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
         scheduler.start()
         app.extensions["heartbeat_scheduler"] = scheduler
-        app.logger.info("Heartbeat watchdog scheduler started.")
+        app.logger.info(
+            "Heartbeat watchdog scheduler started (interval_minutes=%s, next_run_utc=%s).",
+            app.config.get("HEARTBEAT_WATCHDOG_INTERVAL_MINUTES", 5),
+            _format_next_run(),
+        )
 
     return app

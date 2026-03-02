@@ -1,14 +1,16 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, ScrollView, Text } from "react-native";
 import { upsertItinerary } from "@/features/trips/services/itineraryApi";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { ItineraryUpload } from "@/features/trips/components/ItineraryUpload";
 import { ItineraryReview } from "@/features/trips/components/ItineraryReview";
+import { LoadingModal } from "@/shared/components/LoadingModal";
 import type { Day } from "@/features/trips/types";
 
 export default function ItineraryImportScreen() {
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const router = useRouter();
   const normalizedTripId = useMemo(() => String(tripId ?? ""), [tripId]);
   const [extracted, setExtracted] = useState<{ days: Day[] } | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -40,13 +42,9 @@ export default function ItineraryImportScreen() {
 
     try {
       setAnalyzing(true);
-      try {
-        await upsertItinerary(normalizedTripId, days);
-      } catch (persistError) {
-        console.warn("[CheckRisk] Continuing without itinerary persistence:", persistError);
-      }
-      const report = await analyzeTripRisk(normalizedTripId, days);
-      Alert.alert("Risk ready", report.summary || "Risk analysis completed.");
+      await upsertItinerary(normalizedTripId, days);
+      await analyzeTripRisk(normalizedTripId, days);
+      router.replace(`/trips/${normalizedTripId}/risk`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to run risk analysis";
       Alert.alert("Risk analysis failed", message);
@@ -61,7 +59,15 @@ export default function ItineraryImportScreen() {
         tripId={normalizedTripId}
         onItineraryExtracted={setExtracted}
         onCancel={() => {
-          Alert.alert("Canceled", "File upload canceled.");
+          if (router.canGoBack()) {
+            router.back();
+            return;
+          }
+          if (normalizedTripId) {
+            router.replace(`/trips/${normalizedTripId}`);
+            return;
+          }
+          router.replace("/trips");
         }}
       />
     );
@@ -79,9 +85,15 @@ export default function ItineraryImportScreen() {
         onConfirm={(days) => void onSavePress(days)}
         onCheckRisk={(days) => void onCheckRiskPress(days)}
         onEdit={() => setExtracted(null)}
+        saving={submitting}
+        checkingRisk={analyzing}
       />
-      {submitting ? <Text>Saving itinerary...</Text> : null}
-      {analyzing ? <Text>Running risk analysis...</Text> : null}
+
+      <LoadingModal
+        visible={analyzing}
+        title="Analyzing Trip Risk"
+        message="Saving itinerary and generating risk report..."
+      />
     </ScrollView>
   );
 }

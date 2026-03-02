@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from app.models import alerts as alerts_model
 from app.models import heartbeats as heartbeats_model
-from app.models import itinerary_segments as itinerary_segments_model
+from app.models import itinerary_risks as itinerary_risks_model
 from app.models import risk_reports as risk_reports_model
 from app.models import traveler_status as traveler_status_model
 
@@ -93,35 +93,37 @@ def test_insert_heartbeat_uses_sqlalchemy_engine(monkeypatch):
     assert len(calls) == 1
 
 
-def test_list_segments_for_trip_uses_sqlalchemy_engine(monkeypatch):
+def test_list_expected_offline_windows_for_trip_uses_sqlalchemy_engine(monkeypatch):
     expected_rows = [
-        {"trip_id": "trp_1", "segment_order": 1, "expected_offline_minutes": 30},
-        {"trip_id": "trp_1", "segment_order": 2, "expected_offline_minutes": 60},
+        {"expected_offline_minutes": 30, "connectivity_risk": "moderate"},
+        {"expected_offline_minutes": 60, "connectivity_risk": "severe"},
     ]
 
     def strategy(sql: str, params: dict):
-        assert "FROM itinerary_segments" in sql
+        assert "FROM itinerary_risks" in sql
         assert params["trip_id"] == "trp_1"
         return expected_rows
 
-    monkeypatch.setattr(itinerary_segments_model, "get_db_engine", lambda: _FakeEngine(strategy))
+    monkeypatch.setattr(itinerary_risks_model, "get_db_engine", lambda: _FakeEngine(strategy))
 
-    rows = itinerary_segments_model.list_segments_for_trip("trp_1")
+    rows = itinerary_risks_model.list_expected_offline_windows_for_trip("trp_1")
 
     assert rows == expected_rows
 
 
 def test_save_risk_report_serializes_json(monkeypatch):
+    trip_id = str(uuid4())
+
     def strategy(sql: str, params: dict):
         assert "INSERT INTO risk_reports" in sql
-        assert params["trip_id"] == "trp_1"
+        assert params["trip_id"] == trip_id
         decoded = json.loads(params["report"])
         assert decoded["summary"] == "ok"
-        return [{"id": "rr_1", "trip_id": "trp_1", "report": decoded}]
+        return [{"id": "rr_1", "trip_id": trip_id, "report": decoded}]
 
     monkeypatch.setattr(risk_reports_model, "get_db_engine", lambda: _FakeEngine(strategy))
 
-    created = risk_reports_model.save_risk_report("trp_1", {"summary": "ok", "days": []})
+    created = risk_reports_model.save_risk_report(trip_id, {"summary": "ok", "days": []})
 
     assert created["id"] == "rr_1"
     assert created["report"]["summary"] == "ok"
@@ -134,7 +136,7 @@ def test_alert_event_create_and_recent_check(monkeypatch):
     def strategy(sql: str, params: dict):
         if "INSERT INTO alert_events" in sql:
             assert params["user_id"] == user_id
-            assert json.loads(params["channels"]) == ["sms"]
+            assert json.loads(params["channels"]) == ["telegram"]
             return [{"id": params["id"], "user_id": user_id, "trip_id": trip_id}]
         if "FROM alert_events" in sql:
             assert params["stage"] == "stage_1_initial_alert"
@@ -150,7 +152,7 @@ def test_alert_event_create_and_recent_check(monkeypatch):
             "trip_id": trip_id,
             "stage": "stage_1_initial_alert",
             "message": "msg",
-            "channels": ["sms"],
+            "channels": ["telegram"],
             "recipients": [{"phone": "+919999999999"}],
             "escalation_context": {"x": 1},
         }
