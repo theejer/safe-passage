@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadItineraryPDF } from "@/features/trips/services/itineraryApi";
 import { Day } from "../types";
@@ -18,7 +18,12 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
     try {
       setError(null);
       const result = await DocumentPicker.getDocumentAsync({
-        type: "application/pdf",
+        type: [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "application/msword",
+          "text/plain",
+        ],
       });
 
       if (result.canceled) {
@@ -36,11 +41,23 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
       // Create FormData and upload
       const formData = new FormData();
       formData.append("trip_id", tripId);
-      formData.append("file", {
-        uri: file.uri,
-        type: "application/pdf",
-        name: file.name || "itinerary.pdf",
-      } as any);
+
+      if (Platform.OS === "web") {
+        const webFile = (file as any).file as File | undefined;
+        if (webFile) {
+          formData.append("file", webFile, webFile.name || file.name || "itinerary-document");
+        } else {
+          const blobResponse = await fetch(file.uri);
+          const blob = await blobResponse.blob();
+          formData.append("file", blob, file.name || "itinerary-document");
+        }
+      } else {
+        formData.append("file", {
+          uri: file.uri,
+          type: file.mimeType || "application/octet-stream",
+          name: file.name || "itinerary-document",
+        } as any);
+      }
 
       console.log("[ItineraryUpload] Uploading PDF for trip:", tripId);
       const days = await uploadItineraryPDF(formData);
@@ -63,9 +80,9 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
 
   return (
     <View style={{ flex: 1, padding: 16, justifyContent: "center", alignItems: "center", gap: 16 }}>
-      <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>Upload Itinerary PDF</Text>
+      <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>Upload Itinerary File</Text>
       <Text style={{ fontSize: 14, color: "#666", textAlign: "center" }}>
-        Select a PDF file containing your trip itinerary. We'll extract the details automatically.
+        Select a PDF or document containing your trip itinerary. We&apos;ll extract the details automatically.
       </Text>
 
       {error && (
@@ -77,7 +94,7 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
       {loading && (
         <View style={{ alignItems: "center", gap: 12 }}>
           <ActivityIndicator size="large" color="#1976d2" />
-          <Text style={{ color: "#666" }}>Processing PDF...</Text>
+            <Text style={{ color: "#666" }}>Processing itinerary document...</Text>
         </View>
       )}
 
@@ -94,7 +111,7 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
             }}
             onPress={pickPDF}
           >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Choose PDF File</Text>
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Choose File</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

@@ -73,6 +73,7 @@ export default function TripFlowScreen() {
         <ItineraryReview
           itinerary={extractedItinerary}
           onConfirm={handleConfirmItinerary}
+          onCheckRisk={handleConfirmItinerary}
           onEdit={() => setStep("upload")}
         />
       )}

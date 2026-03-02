@@ -1,15 +1,16 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, TextInput, Button } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, Button } from "react-native";
 import { Day } from "../types";
 import { DayEditor } from "./DayEditor";
 
 type ItineraryReviewProps = {
   itinerary: { days: Day[] };
   onConfirm: (days: Day[]) => void;
+  onCheckRisk: (days: Day[]) => void;
   onEdit: () => void;
 };
 
-export function ItineraryReview({ itinerary, onConfirm, onEdit }: ItineraryReviewProps) {
+export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: ItineraryReviewProps) {
   const [days, setDays] = useState<Day[]>(itinerary.days);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -165,13 +166,17 @@ export function ItineraryReview({ itinerary, onConfirm, onEdit }: ItineraryRevie
 
       <View style={{ gap: 8, flexDirection: "row" }}>
         <Button
-          title="Edit PDF"
+          title="Edit File"
           color="#999"
           onPress={onEdit}
         />
         <Button
-          title="Confirm"
+          title="Save"
           onPress={() => onConfirm(days)}
+        />
+        <Button
+          title="Check Risk"
+          onPress={() => onCheckRisk(days)}
         />
       </View>
     </View>

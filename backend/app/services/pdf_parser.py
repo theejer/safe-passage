@@ -1,48 +1,84 @@
-"""Service for extracting itinerary data from PDF using AI.
+"""Service for extracting itinerary data from uploaded documents using AI.
 
 Handles:
-1. PDF text extraction via pdfplumber
+1. Text extraction from PDF/DOCX/TXT inputs
 2. LLM parsing to structured itinerary JSON
 3. Fallback to manual parsing if LLM unavailable
 """
 
 import json
 import os
-import tempfile
 from typing import Any
 
 import pdfplumber
 from openai import OpenAI, APIError
+
+try:
+    from docx import Document
+except Exception:
+    Document = None
 
 from app.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def extract_itinerary_from_pdf(file_path: str) -> dict[str, Any]:
-    """Extract itinerary from PDF file using AI parsing.
+def extract_itinerary_from_document(file_path: str) -> dict[str, Any]:
+    """Extract itinerary from a supported document file using AI parsing.
     
     Args:
-        file_path: Absolute path to PDF file
+        file_path: Absolute path to source document (.pdf/.docx/.txt)
         
     Returns:
         Structured itinerary dict with 'days' and 'meta' keys
     """
-    # Step 1: Extract text from PDF
-    pdf_text = _extract_pdf_text(file_path)
-    if not pdf_text.strip():
-        logger.warning(f"No text extracted from PDF: {file_path}")
+    itinerary_text = _extract_document_text(file_path)
+    if not itinerary_text.strip():
+        logger.warning(f"No text extracted from itinerary document: {file_path}")
+        return {"days": [], "meta": {}}
+
+    logger.info(
+        "[ItineraryParser] Extracted text length=%s preview=%s",
+        len(itinerary_text),
+        itinerary_text[:800],
+    )
+
+    return extract_itinerary_from_text(itinerary_text)
+
+
+def extract_itinerary_from_pdf(file_path: str) -> dict[str, Any]:
+    """Backwards-compatible wrapper for older callers expecting PDF-only API."""
+    return extract_itinerary_from_document(file_path)
+
+
+def extract_itinerary_from_text(itinerary_text: str) -> dict[str, Any]:
+    """Extract itinerary JSON from raw itinerary text."""
+    if not itinerary_text.strip():
         return {"days": [], "meta": {}}
 
     # Step 2: Use LLM to structure text
     try:
-        itinerary = _parse_with_llm(pdf_text)
-        logger.info(f"Successfully parsed itinerary from PDF with {len(itinerary.get('days', []))} days")
+        itinerary = _parse_with_llm(itinerary_text)
+        logger.info(f"Successfully parsed itinerary text with {len(itinerary.get('days', []))} days")
         return itinerary
     except (APIError, ValueError) as e:
         logger.warning(f"LLM parsing failed: {e}, attempting fallback parsing")
         # Fallback: basic text parsing if LLM unavailable
-        return _parse_with_fallback(pdf_text)
+        return _parse_with_fallback(itinerary_text)
+
+
+def _extract_document_text(file_path: str) -> str:
+    """Extract text from supported itinerary document formats."""
+    extension = os.path.splitext(file_path)[1].lower()
+    if extension == ".pdf":
+        return _extract_pdf_text(file_path)
+    if extension == ".docx":
+        return _extract_docx_text(file_path)
+    if extension in {".txt", ".md", ".csv", ".doc"}:
+        return _extract_plain_text(file_path)
+
+    logger.warning("Unsupported itinerary document extension: %s", extension)
+    return ""
 
 
 def _extract_pdf_text(file_path: str) -> str:
@@ -66,6 +102,34 @@ def _extract_pdf_text(file_path: str) -> str:
     except Exception as e:
         logger.error(f"PDF text extraction failed: {e}")
         return ""
+
+
+def _extract_docx_text(file_path: str) -> str:
+    """Extract text from DOCX files when python-docx is available."""
+    if Document is None:
+        logger.error("DOCX parsing requires python-docx; install dependency first")
+        return ""
+
+    try:
+        document = Document(file_path)
+        lines = [paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text and paragraph.text.strip()]
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error(f"DOCX text extraction failed: {e}")
+        return ""
+
+
+def _extract_plain_text(file_path: str) -> str:
+    """Extract text from plain text-like files using best-effort decoding."""
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            with open(file_path, "r", encoding=encoding, errors="ignore") as handle:
+                return handle.read()
+        except Exception:
+            continue
+
+    logger.error("Plain text extraction failed for file: %s", file_path)
+    return ""
 
 
 def _parse_with_llm(pdf_text: str) -> dict[str, Any]:

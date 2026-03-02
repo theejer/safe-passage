@@ -3,8 +3,10 @@
 from flask import Blueprint, jsonify, request
 
 from app.models.risk_reports import latest_risk_report, save_risk_report
+from app.utils.logging import get_logger
 
 reports_bp = Blueprint("reports", __name__, url_prefix="/api/reports")
+logger = get_logger(__name__)
 
 @reports_bp.post("")
 def create_report():
@@ -17,7 +19,18 @@ def create_report():
         return jsonify({"error": "trip_id and report are required"}), 400
 
     payload = report if summary is None else {**report, "summary": summary}
-    created = save_risk_report(trip_id, payload)
+    try:
+        created = save_risk_report(trip_id, payload)
+    except RuntimeError as exc:
+        logger.warning("Skipping risk report persistence for trip %s: %s", trip_id, exc)
+        return jsonify({
+            "id": None,
+            "trip_id": trip_id,
+            "report": payload,
+            "summary": summary,
+            "created_at": None,
+            "saved": False,
+        }), 201
 
     return jsonify({
         "id": created.get("id"),
@@ -33,7 +46,11 @@ def list_reports():
     if not trip_id:
         return jsonify({"error": "trip_id query parameter is required"}), 400
 
-    report = latest_risk_report(trip_id)
+    try:
+        report = latest_risk_report(trip_id)
+    except RuntimeError as exc:
+        logger.warning("Skipping risk report fetch for trip %s: %s", trip_id, exc)
+        return jsonify({"items": []}), 200
     if not report:
         return jsonify({"items": []}), 200
 

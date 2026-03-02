@@ -18,6 +18,7 @@ requests==2.32.3
 twilio==9.4.6
 firebase-admin==6.7.0
 pdfplumber==0.10.3
+python-docx==1.1.2
 
 # Testing
 pytest==8.3.5

@@ -46,6 +46,24 @@ uv venv .venv --python 3.11 --seed
 
 ## Environment Variables
 
+Preferred local setup: create `backend/.env` (or copy `backend/.env.example`) and set values there.
+
+```powershell
+cd backend
+copy .env.example .env
+```
+
+Then set at minimum:
+
+```dotenv
+OPENAI_API_KEY=<your-openai-key>
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_KEY=<service-or-anon-key>
+APP_CONFIG=development
+```
+
+The backend now auto-loads `backend/.env` on startup.
+
 Set these before running the API (PowerShell example):
 
 ```powershell

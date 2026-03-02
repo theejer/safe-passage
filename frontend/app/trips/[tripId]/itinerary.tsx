@@ -1,9 +1,10 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Text, ScrollView, Alert } from "react-native";
 import { DayList } from "@/features/trips/components/DayList";
 import { Button } from "@/shared/components/Button";
 import { getLatestItinerary, upsertItinerary } from "@/features/trips/services/itineraryApi";
+import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import type { Day } from "@/features/trips/types";
 
 function createEmptyDay(): Day {
@@ -36,10 +37,12 @@ function validateDays(days: Day[]) {
 export default function ItineraryEditorScreen() {
   // View/edit itinerary day entries and save offline-first to backend sync queue.
   const { tripId } = useLocalSearchParams<{ tripId: string }>();
+  const router = useRouter();
   const normalizedTripId = useMemo(() => String(tripId ?? ""), [tripId]);
   const [days, setDays] = useState<Day[]>([createEmptyDay()]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -79,6 +82,27 @@ export default function ItineraryEditorScreen() {
     }
   }
 
+  async function onCheckRiskPress() {
+    if (!normalizedTripId) {
+      Alert.alert("Missing trip", "Trip ID is missing.");
+      return;
+    }
+
+    try {
+      validateDays(days);
+      setAnalyzing(true);
+      await upsertItinerary(normalizedTripId, days);
+      const report = await analyzeTripRisk(normalizedTripId, days);
+      Alert.alert("Risk ready", report.summary || "Risk analysis completed.");
+      router.push(`/trips/${normalizedTripId}/risk`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to analyze risk";
+      Alert.alert("Risk check failed", message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
       <Text style={{ fontSize: 20, fontWeight: "700" }}>Itinerary</Text>
@@ -86,6 +110,7 @@ export default function ItineraryEditorScreen() {
       {loading ? <Text>Loading itinerary...</Text> : null}
       {!loading ? <DayList tripId={normalizedTripId} days={days} onChangeDays={setDays} /> : null}
       <Button onPress={() => void onSavePress()}>{saving ? "Saving..." : "Save itinerary"}</Button>
+      <Button onPress={() => void onCheckRiskPress()}>{analyzing ? "Checking risk..." : "Check risk"}</Button>
       <Text>Offline fallback: changes are cached locally and queued for sync if backend is unavailable.</Text>
     </ScrollView>
   );
