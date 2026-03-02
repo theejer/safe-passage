@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Platform, ScrollView } from "react-native";
+import { View, Text, ActivityIndicator, Platform, ScrollView } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { uploadItineraryPDF } from "@/features/trips/services/itineraryApi";
 import { Day } from "../types";
+import { Button } from "@/shared/components/Button";
 
 type ItineraryUploadProps = {
   tripId: string;
@@ -100,34 +101,10 @@ export function ItineraryUpload({ tripId, onItineraryExtracted, onCancel }: Itin
 
       {!loading && (
         <>
-          <TouchableOpacity
-            style={{
-              backgroundColor: "#1976d2",
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
-              width: "100%",
-              alignItems: "center",
-            }}
-            onPress={pickPDF}
-          >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Choose File</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              paddingVertical: 12,
-              paddingHorizontal: 24,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: "#999",
-              width: "100%",
-              alignItems: "center",
-            }}
-            onPress={onCancel}
-          >
-            <Text style={{ color: "#333", fontSize: 16, fontWeight: "600" }}>Cancel</Text>
-          </TouchableOpacity>
+          <Button onPress={() => void pickPDF()}>Choose File</Button>
+          <Button variant="outline" onPress={onCancel}>
+            Cancel
+          </Button>
         </>
       )}
     </ScrollView>

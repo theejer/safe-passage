@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, TextInput, Button, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
+import { View, TextInput, TouchableOpacity, Text, Modal, ScrollView } from "react-native";
 import { createTrip } from "@/features/trips/services/tripsApi";
 import { getItem } from "@/features/storage/services/localStore";
+import { Button } from "@/shared/components/Button";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 
@@ -146,8 +147,12 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
             </View>
 
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <Button title="Cancel" color="#999" onPress={onClose} />
-              <Button title="Confirm" onPress={handleConfirm} />
+              <Button block={false} variant="outline" size="sm" onPress={onClose}>
+                Cancel
+              </Button>
+              <Button block={false} size="sm" onPress={handleConfirm}>
+                Confirm
+              </Button>
             </View>
           </View>
         </View>
@@ -205,7 +210,7 @@ export function TripForm({ mode, onSuccess }: TripFormProps) {
         onDateChange={setEndDate}
       />
 
-      <Button title={mode === "create" ? "Create trip" : "Save changes"} onPress={() => void onSubmit()} />
+      <Button onPress={() => void onSubmit()}>{mode === "create" ? "Create trip" : "Save changes"}</Button>
     </ScrollView>
   );
 }

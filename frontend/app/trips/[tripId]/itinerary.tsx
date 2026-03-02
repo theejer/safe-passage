@@ -114,7 +114,9 @@ export default function ItineraryEditorScreen() {
       {loading ? <Text>Loading itinerary...</Text> : null}
       {!loading ? <DayList tripId={normalizedTripId} days={days} onChangeDays={setDays} /> : null}
       <Button onPress={() => void onSavePress()}>{saving ? "Saving..." : "Save itinerary"}</Button>
-      <Button onPress={() => void onCheckRiskPress()}>{analyzing ? "Checking risk..." : "Check risk"}</Button>
+      <Button variant="secondary" onPress={() => void onCheckRiskPress()}>
+        {analyzing ? "Checking risk..." : "Check risk"}
+      </Button>
       <Text>Offline fallback: changes are cached locally and queued for sync if backend is unavailable.</Text>
     </ScrollView>
   );
