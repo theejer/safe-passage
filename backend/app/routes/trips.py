@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
 from app.models.itineraries import get_itinerary, upsert_itinerary
-from app.models.trips import create_trip, list_trips_by_user
+from app.models.trips import create_trip, delete_trip_by_id, list_trips_by_user
 from app.schemas.itinerary_schema import ItinerarySchema
 from app.schemas.trip_schema import TripCreateSchema
 from app.services.pdf_parser import extract_itinerary_from_document, extract_itinerary_from_text
@@ -140,6 +140,18 @@ def list_trips_route():
 
     trips = list_trips_by_user(user_id)
     return jsonify({"items": trips})
+
+
+@trips_bp.delete("/<trip_id>")
+def delete_trip_route(trip_id: str):
+    """Delete a trip and trip-scoped persisted records."""
+    try:
+        deleted = delete_trip_by_id(trip_id)
+    except SQLAlchemyError as exc:
+        logger.exception("Trip delete failed due to database error")
+        return jsonify({"error": "database error while deleting trip", "details": str(exc)}), 500
+
+    return jsonify({"trip_id": trip_id, "deleted": deleted}), 200
 
 
 @trips_bp.put("/<trip_id>/itinerary")

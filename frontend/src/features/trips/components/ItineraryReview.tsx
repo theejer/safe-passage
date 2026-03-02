@@ -9,9 +9,18 @@ type ItineraryReviewProps = {
   onConfirm: (days: Day[]) => void;
   onCheckRisk: (days: Day[]) => void;
   onEdit: () => void;
+  saving: boolean;
+  checkingRisk: boolean;
 };
 
-export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: ItineraryReviewProps) {
+export function ItineraryReview({
+  itinerary,
+  onConfirm,
+  onCheckRisk,
+  onEdit,
+  saving = false,
+  checkingRisk = false,
+}: ItineraryReviewProps) {
   const [days, setDays] = useState<Day[]>(itinerary.days);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -64,32 +73,24 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit }: I
           <Button block={false} size="sm" variant="outline" onPress={addDay} disabled={saving || checkingRisk}>
             Add Day
           </Button>
-          <TouchableOpacity
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 6,
-              backgroundColor: viewMode === "table" ? "#1976d2" : "#e0e0e0",
-            }}
+          <Button
+            block={false}
+            size="sm"
+            variant="primary"
             onPress={() => setViewMode("table")}
+            disabled={saving || checkingRisk}
           >
-            <Text style={{ fontSize: 12, color: viewMode === "table" ? "white" : "#666", fontWeight: "600" }}>
-              Table
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 6,
-              backgroundColor: viewMode === "cards" ? "#1976d2" : "#e0e0e0",
-            }}
+            Table
+          </Button>
+          <Button
+            block={false}
+            size="sm"
+            variant="primary"
             onPress={() => setViewMode("cards")}
+            disabled={saving || checkingRisk}
           >
-            <Text style={{ fontSize: 12, color: viewMode === "cards" ? "white" : "#666", fontWeight: "600" }}>
-              Cards
-            </Text>
-          </TouchableOpacity>
+            Cards
+          </Button>
         </View>
       </View>
 

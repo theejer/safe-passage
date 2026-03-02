@@ -164,6 +164,44 @@ def get_trip_by_id(trip_id: str) -> dict:
     return dict(row) if row else {}
 
 
+def delete_trip_by_id(trip_id: str) -> bool:
+    """Delete trip and dependent trip-scoped records."""
+    if not _is_uuid(trip_id):
+        return False
+
+    engine = get_db_engine()
+    related_trip_tables = [
+        "itineraries",
+        "risk_reports",
+        "itinerary_risks",
+        "heartbeats",
+        "alerts",
+        "traveler_status",
+        "monitoring_expectations",
+    ]
+
+    try:
+        with engine.begin() as connection:
+            for table_name in related_trip_tables:
+                try:
+                    connection.execute(
+                        text(f"DELETE FROM {table_name} WHERE trip_id = :trip_id"),
+                        {"trip_id": trip_id},
+                    )
+                except (ProgrammingError, OperationalError) as exc:
+                    if _is_missing_table_error(exc, table_name) or _is_missing_column_error(exc, "trip_id"):
+                        continue
+                    raise
+
+            result = connection.execute(text("DELETE FROM trips WHERE id = :trip_id"), {"trip_id": trip_id})
+            return (result.rowcount or 0) > 0
+    except (ProgrammingError, OperationalError) as exc:
+        if _is_missing_table_error(exc, "trips"):
+            _ensure_trips_table_for_sqlite()
+            return False
+        raise
+
+
 def get_trip_alert_context(trip_id: str) -> dict:
     """Fetch minimal joined trip context for emergency alerts."""
     if not _is_uuid(trip_id):

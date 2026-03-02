@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, ScrollView, TextInput } from "react-native";
+import { View, Text, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from "react-native";
 import { TripForm } from "@/features/trips/components/TripForm";
 import { ItineraryUpload } from "@/features/trips/components/ItineraryUpload";
 import { ItineraryReview } from "@/features/trips/components/ItineraryReview";
@@ -61,6 +61,16 @@ function validateMetadata(metadata: TripMetadata) {
   if (!metadata.endDate.trim()) {
     throw new Error("End date is required");
   }
+
+  const start = parseIsoDate(metadata.startDate);
+  const end = parseIsoDate(metadata.endDate);
+  if (!start || !end) {
+    throw new Error("Start date and end date must be valid dates.");
+  }
+
+  if (start.getTime() > end.getTime()) {
+    throw new Error("End date cannot be earlier than the start date.");
+  }
 }
 
 export default function TripFlowScreen() {
@@ -71,7 +81,140 @@ export default function TripFlowScreen() {
   const [tripId, setTripId] = useState<string | null>(initialTripId || null);
   const [tripMetadata, setTripMetadata] = useState<TripMetadata | null>(null);
   const [extractedItinerary, setExtractedItinerary] = useState<{ days: Day[] } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [checkingRisk, setCheckingRisk] = useState(false);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+
+  function generateYears() {
+    const current = new Date().getFullYear();
+    return Array.from({ length: 10 }, (_, i) => current - 5 + i);
+  }
+
+  function generateDays(year: number, month: number) {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  }
+
+  function DatePickerModal({
+    visible,
+    onClose,
+    date,
+    onDateChange,
+  }: {
+    visible: boolean;
+    onClose: () => void;
+    date: Date | null;
+    onDateChange: (date: Date) => void;
+  }) {
+    const currentDate = date || new Date();
+    const [year, setYear] = useState(currentDate.getFullYear());
+    const [month, setMonth] = useState(currentDate.getMonth());
+    const [day, setDay] = useState(currentDate.getDate());
+
+    const handleConfirm = () => {
+      onDateChange(new Date(year, month, day));
+      onClose();
+    };
+
+    return (
+      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <View style={{ backgroundColor: "white", borderRadius: 12, padding: 20, width: "80%" }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", marginBottom: 16 }}>Select Date</Text>
+
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              <ScrollView style={{ flex: 1, maxHeight: 150, borderWidth: 1, borderColor: "#ccc", borderRadius: 8 }}>
+                {generateYears().map((y) => (
+                  <TouchableOpacity
+                    key={y}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      backgroundColor: year === y ? "#e3f2fd" : "white",
+                    }}
+                    onPress={() => setYear(y)}
+                  >
+                    <Text style={{ textAlign: "center", color: year === y ? "#1976d2" : "#000" }}>
+                      {y}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <ScrollView style={{ flex: 1, maxHeight: 150, borderWidth: 1, borderColor: "#ccc", borderRadius: 8 }}>
+                {Array.from({ length: 12 }, (_, i) => i).map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      backgroundColor: month === m ? "#e3f2fd" : "white",
+                    }}
+                    onPress={() => setMonth(m)}
+                  >
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        color: month === m ? "#1976d2" : "#000",
+                      }}
+                    >
+                      {String(m + 1).padStart(2, "0")}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <ScrollView style={{ flex: 1, maxHeight: 150, borderWidth: 1, borderColor: "#ccc", borderRadius: 8 }}>
+                {generateDays(year, month).map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      backgroundColor: day === d ? "#e3f2fd" : "white",
+                    }}
+                    onPress={() => setDay(d)}
+                  >
+                    <Text
+                      style={{
+                        textAlign: "center",
+                        color: day === d ? "#1976d2" : "#000",
+                      }}
+                    >
+                      {String(d).padStart(2, "0")}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+              <TouchableOpacity
+                style={{ borderWidth: 1, borderColor: "#1565c0", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14 }}
+                onPress={onClose}
+              >
+                <Text style={{ color: "#1565c0", fontWeight: "700" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ borderWidth: 1, borderColor: "#1565c0", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: "#1976d2" }}
+                onPress={handleConfirm}
+              >
+                <Text style={{ color: "white", fontWeight: "700" }}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   function handleTripMetadataSubmit(metadata: TripMetadata) {
     // Generate a temporary tripId but DON'T create the trip in DB yet
@@ -85,6 +228,12 @@ export default function TripFlowScreen() {
     setTripMetadata((current) => {
       if (!current) return current;
       const next = { ...current, ...patch };
+      const start = parseIsoDate(next.startDate);
+      const end = parseIsoDate(next.endDate);
+      if (start && end && start.getTime() > end.getTime()) {
+        Alert.alert("Invalid end date", "End date cannot be earlier than the start date.");
+        return current;
+      }
 
       setExtractedItinerary((existing) => {
         if (!existing) return existing;
@@ -114,6 +263,13 @@ export default function TripFlowScreen() {
     }
     try {
       validateMetadata(tripMetadata);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid trip details.";
+      alert(message);
+      return;
+    }
+
+    try {
       setSaving(true);
       const persistedTrip = await createTrip({
         id: tripId,
@@ -134,7 +290,7 @@ export default function TripFlowScreen() {
       console.error("Failed to save trip and itinerary:", error);
       alert("Failed to save trip and itinerary. Please try again.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
 
@@ -145,6 +301,13 @@ export default function TripFlowScreen() {
     }
     try {
       validateMetadata(tripMetadata);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid trip details.";
+      alert(message);
+      return;
+    }
+
+    try {
       setCheckingRisk(true);
       console.log("[TripFlow] Check Risk clicked", { tripId, itineraryDays: days.length });
       const persistedTrip = await createTrip({
@@ -163,7 +326,7 @@ export default function TripFlowScreen() {
       console.error("Failed to analyze risk:", error);
       alert("Failed to analyze risk. Please try again.");
     } finally {
-      setLoading(false);
+      setCheckingRisk(false);
     }
   }
 
@@ -207,19 +370,35 @@ export default function TripFlowScreen() {
             style={{ borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 12, fontSize: 16, backgroundColor: "#ffffff" }}
           />
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <TextInput
-              placeholder="Start date (YYYY-MM-DD)"
-              value={tripMetadata.startDate}
-              onChangeText={(value) => updateTripMetadata({ startDate: value })}
-              style={{ flex: 1, borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 12, fontSize: 14, backgroundColor: "#ffffff" }}
-            />
-            <TextInput
-              placeholder="End date (YYYY-MM-DD)"
-              value={tripMetadata.endDate}
-              onChangeText={(value) => updateTripMetadata({ endDate: value })}
-              style={{ flex: 1, borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 12, fontSize: 14, backgroundColor: "#ffffff" }}
-            />
+            <TouchableOpacity
+              style={{ flex: 1, borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 12, justifyContent: "center", backgroundColor: "#ffffff" }}
+              onPress={() => setShowStartDatePicker(true)}
+            >
+              <Text style={{ fontSize: 14, color: tripMetadata.startDate ? "#111827" : "#9ca3af" }}>
+                Start date: {tripMetadata.startDate || "Select date"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1, borderWidth: 1, borderColor: "#d1d5db", borderRadius: 10, padding: 12, justifyContent: "center", backgroundColor: "#ffffff" }}
+              onPress={() => setShowEndDatePicker(true)}
+            >
+              <Text style={{ fontSize: 14, color: tripMetadata.endDate ? "#111827" : "#9ca3af" }}>
+                End date: {tripMetadata.endDate || "Select date"}
+              </Text>
+            </TouchableOpacity>
           </View>
+          <DatePickerModal
+            visible={showStartDatePicker}
+            onClose={() => setShowStartDatePicker(false)}
+            date={parseIsoDate(tripMetadata.startDate)}
+            onDateChange={(value) => updateTripMetadata({ startDate: formatIsoDate(value) })}
+          />
+          <DatePickerModal
+            visible={showEndDatePicker}
+            onClose={() => setShowEndDatePicker(false)}
+            date={parseIsoDate(tripMetadata.endDate)}
+            onDateChange={(value) => updateTripMetadata({ endDate: formatIsoDate(value) })}
+          />
           <ItineraryReview
             itinerary={extractedItinerary}
             onConfirm={handleConfirmItinerary}

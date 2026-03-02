@@ -1,12 +1,14 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, Text, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTrips } from "@/features/trips/hooks/useTrips";
 import { getItem } from "@/features/storage/services/localStore";
 import { useRiskReport } from "@/features/risk/hooks/useRiskReport";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import { getLatestItinerary } from "@/features/trips/services/itineraryApi";
+import type { Trip } from "@/features/trips/types";
+import { Button } from "@/shared/components/Button";
 
 const ACTIVE_USER_ID_KEY = "active_user_id";
 
@@ -23,8 +25,9 @@ function DashboardTripScore({ tripId }: { tripId: string }) {
   );
 }
 
-function DashboardTripActions({ tripId }: { tripId: string }) {
+function DashboardTripActions({ trip, onSaved }: { trip: Trip; onSaved: () => Promise<void> | void }) {
   const router = useRouter();
+  const tripId = trip.id;
   const [generatingScore, setGeneratingScore] = useState(false);
 
   async function onGenerateScore() {
@@ -63,7 +66,6 @@ function DashboardTripActions({ tripId }: { tripId: string }) {
       <Button variant="outline" size="sm" block={false} onPress={() => router.replace(`/trips/${tripId}/risk`)}>
         Open Risk
       </Button>
-      {statusMessage ? <Text style={{ color: "#6b7280" }}>{statusMessage}</Text> : null}
     </View>
   );
 }
@@ -137,7 +139,7 @@ export default function DashboardScreen() {
                   {trip.startDate} → {trip.endDate}
                 </Text>
                 <DashboardTripScore tripId={trip.id} />
-                <DashboardTripActions tripId={trip.id} />
+                <DashboardTripActions trip={trip} onSaved={reload} />
               </View>
             ))
           : null}

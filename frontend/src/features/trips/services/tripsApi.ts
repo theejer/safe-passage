@@ -5,6 +5,7 @@ import {
   enqueueSyncJob,
   initializeOfflineDb,
   listTrips as listLocalTrips,
+  deleteTripById,
   upsertTrip,
   type SyncQueueJob,
 } from "@/features/storage/services/offlineDb";
@@ -131,6 +132,42 @@ export async function upsertTripWithSync(trip: Trip) {
   });
 }
 
+export async function deleteTrip(trip: Pick<Trip, "id" | "userId">) {
+  await initializeOfflineDb();
+  await deleteTripById(trip.id);
+
+  if (!canSyncTripOnline(trip.userId)) {
+    return;
+  }
+
+  const wirePayload = {
+    id: trip.id,
+    user_id: trip.userId,
+  };
+
+  const offline = await isDeviceOffline();
+  if (offline) {
+    await enqueueSyncJob({
+      entityType: "trip",
+      entityId: trip.id,
+      operation: "delete",
+      payload: wirePayload,
+    });
+    return;
+  }
+
+  try {
+    await apiClient.delete(`/trips/${trip.id}`);
+  } catch {
+    await enqueueSyncJob({
+      entityType: "trip",
+      entityId: trip.id,
+      operation: "delete",
+      payload: wirePayload,
+    });
+  }
+}
+
 export async function listTrips(userId: string) {
   await initializeOfflineDb();
   const localItems = await listLocalTrips(userId);
@@ -174,6 +211,17 @@ export async function replayTripSyncJob(job: SyncQueueJob) {
   }
 
   const payload = JSON.parse(job.payload_json) as Record<string, unknown>;
+
+  if (job.operation === "delete") {
+    const tripId = String(payload.id ?? job.entity_id ?? "").trim();
+    if (!tripId) {
+      return;
+    }
+    await apiClient.delete(`/trips/${tripId}`);
+    await deleteTripById(tripId);
+    return;
+  }
+
   const response = (await apiClient.post("/trips", payload)) as TripWire;
   await upsertTrip(fromWireTrip(response));
 }
