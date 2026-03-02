@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from app.models.risk_reports import save_risk_report
 from app.schemas.itinerary_schema import ItinerarySchema
+from app.services.pipeline_adapter import analyze_trip
 from app.services.itinerary_parser import normalize_itinerary
 from app.services.openai_risk_analyzer import OpenAIRiskAnalyzerError, analyze_itinerary_with_openai
 from app.services.risk_engine import analyze_itinerary_risk
@@ -17,6 +18,31 @@ from app.utils.logging import get_logger
 
 itinerary_analysis_bp = Blueprint("itinerary_analysis", __name__)
 logger = get_logger(__name__)
+
+
+@itinerary_analysis_bp.post("/analyze-pipeline")
+def analyze_pipeline_route():
+    """Run integrated parser + multi-analyst + judge pipeline from backend service."""
+    body = request.get_json(force=True) or {}
+    result = analyze_trip(body)
+
+    if result.get("status") != "ok":
+        return jsonify(result), 200
+
+    final_report = result.get("final_report") if isinstance(result.get("final_report"), dict) else {}
+    trip_id = body.get("trip_id")
+    saved = {}
+    if trip_id and final_report:
+        try:
+            saved = save_risk_report(str(trip_id), final_report)
+        except Exception as exc:
+            logger.warning("Could not persist pipeline risk report for trip %s: %s", trip_id, exc)
+
+    response = {
+        **result,
+        "saved": saved,
+    }
+    return jsonify(response), 200
 
 
 def _sanitize_itinerary_payload(raw_itinerary: dict) -> dict:

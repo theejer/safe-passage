@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "status": { "type": "string", "enum": ["ok", "failed"] },
+    "stage": { "type": "string" },
+    "details": { "type": "object" },
+    "parsed_itinerary": { "type": "object" },
+    "analyst_reports": { "type": "object" },
+    "final_report": { "type": "object" },
+    "score_breakdown": { "type": "object" },
+    "judge": { "type": "object" },
+    "news_context": { "type": "object" },
+    "saved": { "type": "object" }
+  },
+  "additionalProperties": true
+}

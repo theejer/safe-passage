@@ -149,6 +149,7 @@ flask run --host 0.0.0.0 --port 5000
 - `PUT /trips/<trip_id>/itinerary`
 - `GET /trips/<trip_id>/itinerary`
 - `POST /itinerary/analyze`
+- `POST /itinerary/analyze-pipeline`
 - `POST /heartbeat` (JWT required, returns 204)
 - `POST /heartbeats`
 - `POST /heartbeats/watchdog/run` (internal key optional via `x-watchdog-key`)
