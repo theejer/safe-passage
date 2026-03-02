@@ -1,8 +1,9 @@
-import { View, TextInput, Button, Text, Modal, ScrollView, TouchableOpacity } from "react-native";
+import { View, TextInput, Text, Modal, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { useUserProfile } from "@/features/user/hooks/useUserProfile";
 import { useState } from "react";
 import { isLikelyPhone } from "@/shared/utils/validators";
+import { Button } from "@/shared/components/Button";
 
 interface CountryCodeOption {
   code: string;
@@ -11,10 +12,9 @@ interface CountryCodeOption {
 
 type UserInfoFormProps = {
   onSaved?: () => void;
-  onSkip?: () => void;
 };
 
-export function UserInfoForm({ onSaved, onSkip }: UserInfoFormProps) {
+export function UserInfoForm({ onSaved }: UserInfoFormProps) {
   // Minimal onboarding form for name + emergency contact phone.
   const router = useRouter();
   const { profile, setProfile, saveProfile, isSaving, error: saveError } = useUserProfile();
@@ -48,6 +48,11 @@ export function UserInfoForm({ onSaved, onSkip }: UserInfoFormProps) {
       isLikelyPhone(profile.emergencyContact.phone)
     ) {
       setError("Your phone and emergency contact phone must not be the same.");
+      return;
+    }
+
+    if (!profile.emergencyContact?.name?.trim() || !isLikelyPhone(profile.emergencyContact?.phone ?? "")) {
+      setError("Emergency contact name and valid phone are required.");
       return;
     }
 
@@ -224,32 +229,20 @@ export function UserInfoForm({ onSaved, onSkip }: UserInfoFormProps) {
       )}
 
       <View style={{ gap: 8 }}>
-        <Button 
-          title={isSaving ? "Saving..." : "Save Profile"} 
-          onPress={handleSave}
-          disabled={isSaving || !profile.fullName || !profile.phone}
-        />
-        <TouchableOpacity 
-          style={{ 
-            paddingVertical: 12, 
-            paddingHorizontal: 16, 
-            borderWidth: 1, 
-            borderColor: "#999",
-            borderRadius: 8,
-            alignItems: "center"
-          }}
-          onPress={() => {
-            if (onSkip) {
-              onSkip();
-              return;
-            }
-            router.replace("/dashboard");
-          }}
+        <Button
+          onPress={() => void handleSave()}
+          disabled={
+            isSaving ||
+            !profile.fullName.trim() ||
+            !isLikelyPhone(profile.phone) ||
+            !profile.emergencyContact?.name?.trim() ||
+            !isLikelyPhone(profile.emergencyContact?.phone ?? "")
+          }
         >
-          <Text style={{ color: "#666", fontSize: 16, fontWeight: "500" }}>Skip for now</Text>
-        </TouchableOpacity>
+          {isSaving ? "Saving..." : "Save Profile"}
+        </Button>
       </View>
-      <Text style={{ color: "#666", fontSize: 12 }}>Profile is used for alerts and trip ownership.</Text>
+      <Text style={{ color: "#666", fontSize: 12 }}>All fields are required before continuing.</Text>
     </View>
   );
 }

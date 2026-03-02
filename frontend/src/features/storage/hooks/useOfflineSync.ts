@@ -1,5 +1,7 @@
 import { useState } from "react";
 import {
+  deleteItineraryByTripId,
+  deleteTripById,
   getPendingSyncJobs,
   initializeOfflineDb,
   markSyncJobDone,
@@ -72,6 +74,20 @@ export function useOfflineSync() {
           await markSyncJobDone(job.id);
           succeeded += 1;
         } catch {
+          if (job.entity_type === "trip") {
+            await deleteTripById(job.entity_id);
+            await markSyncJobDone(job.id);
+            failed += 1;
+            continue;
+          }
+
+          if (job.entity_type === "itinerary") {
+            await deleteItineraryByTripId(job.entity_id);
+            await markSyncJobDone(job.id);
+            failed += 1;
+            continue;
+          }
+
           await markSyncJobFailed(job.id, job.attempts + 1);
           failed += 1;
         }

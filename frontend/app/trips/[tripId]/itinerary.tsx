@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Text, ScrollView, Alert } from "react-native";
 import { DayList } from "@/features/trips/components/DayList";
 import { Button } from "@/shared/components/Button";
+import { MobileBackButton } from "@/shared/components/MobileBackButton";
+import { LoadingModal } from "@/shared/components/LoadingModal";
 import { getLatestItinerary, upsertItinerary } from "@/features/trips/services/itineraryApi";
 import { analyzeTripRisk } from "@/features/risk/services/riskApi";
 import type { Day } from "@/features/trips/types";
@@ -91,14 +93,9 @@ export default function ItineraryEditorScreen() {
     try {
       validateDays(days);
       setAnalyzing(true);
-      try {
-        await upsertItinerary(normalizedTripId, days);
-      } catch (persistError) {
-        console.warn("[CheckRisk] Continuing without itinerary persistence:", persistError);
-      }
-      const report = await analyzeTripRisk(normalizedTripId, days);
-      Alert.alert("Risk ready", report.summary || "Risk analysis completed.");
-      router.push(`/trips/${normalizedTripId}/risk`);
+      await upsertItinerary(normalizedTripId, days);
+      await analyzeTripRisk(normalizedTripId, days);
+      router.replace(`/trips/${normalizedTripId}/risk`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to analyze risk";
       Alert.alert("Risk check failed", message);
@@ -109,6 +106,7 @@ export default function ItineraryEditorScreen() {
 
   return (
     <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
+
       <Text style={{ fontSize: 20, fontWeight: "700" }}>Itinerary</Text>
       <Text>Trip ID: {normalizedTripId || "N/A"}</Text>
       {loading ? <Text>Loading itinerary...</Text> : null}
@@ -118,6 +116,12 @@ export default function ItineraryEditorScreen() {
         {analyzing ? "Checking risk..." : "Check risk"}
       </Button>
       <Text>Offline fallback: changes are cached locally and queued for sync if backend is unavailable.</Text>
+
+      <LoadingModal
+        visible={analyzing}
+        title="Analyzing Trip Risk"
+        message="Saving itinerary and generating risk report..."
+      />
     </ScrollView>
   );
 }

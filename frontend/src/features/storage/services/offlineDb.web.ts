@@ -265,6 +265,20 @@ export async function getTripById(tripId: string) {
   return record ? toTrip(record) : null;
 }
 
+export async function deleteItineraryByTripId(tripId: string) {
+  const store = getStore();
+  store.itineraries.delete(tripId);
+  persistStoreToLocalStorage(store);
+}
+
+export async function deleteTripById(tripId: string) {
+  const store = getStore();
+  store.trips.delete(tripId);
+  store.itineraries.delete(tripId);
+  store.riskReports.delete(tripId);
+  persistStoreToLocalStorage(store);
+}
+
 export async function upsertItinerary(tripId: string, days: Day[]) {
   const store = getStore();
   store.itineraries.set(tripId, clone(days));

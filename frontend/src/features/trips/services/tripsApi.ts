@@ -1,4 +1,5 @@
 import { apiClient } from "@/lib/apiClient";
+import NetInfo from "@react-native-community/netinfo";
 import type { Trip } from "@/features/trips/types";
 import {
   enqueueSyncJob,
@@ -23,6 +24,7 @@ type TripWire = {
 };
 
 type TripCreateInput = Pick<Trip, "userId" | "title" | "startDate" | "endDate"> & {
+  id?: string;
   heartbeatEnabled?: boolean;
 };
 
@@ -37,11 +39,36 @@ function fromWireTrip(value: TripWire): Trip {
   };
 }
 
+async function isDeviceOffline() {
+  try {
+    const net = await NetInfo.fetch();
+    const connected = Boolean(net.isConnected) && Boolean(net.isInternetReachable ?? true);
+    return !connected;
+  } catch {
+    return false;
+  }
+}
+
+function validateTripInput(payload: TripCreateInput) {
+  if (!payload.title?.trim()) {
+    throw new Error("Trip title is required");
+  }
+
+  if (!payload.startDate?.trim()) {
+    throw new Error("Start date is required");
+  }
+
+  if (!payload.endDate?.trim()) {
+    throw new Error("End date is required");
+  }
+}
+
 // CRUD-ish API wrappers for trip metadata.
 export async function createTrip(payload: TripCreateInput) {
   await initializeOfflineDb();
+  validateTripInput(payload);
 
-  const tripId = generateUuidV4();
+  const tripId = payload.id ?? generateUuidV4();
   const wirePayload = {
     id: tripId,
     user_id: payload.userId,
@@ -60,36 +87,48 @@ export async function createTrip(payload: TripCreateInput) {
     heartbeatEnabled: payload.heartbeatEnabled ?? true,
   };
 
-  if (!canSyncTripOnline(payload.userId)) {
-    await upsertTrip(localTrip);
+  // Always write to SQLite first
+  await upsertTrip(localTrip);
+  await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
+
+  // Then attempt to sync remotely
+  if (canSyncTripOnline(payload.userId)) {
+    try {
+      const response = await apiClient.post("/trips", wirePayload);
+      const wireTrip = response as TripWire;
+      const normalized = fromWireTrip(wireTrip);
+      await upsertTrip(normalized);
+    } catch {
+      // If remote sync fails, queue for retry
+      await enqueueSyncJob({
+        entityType: "trip",
+        entityId: localTrip.id,
+        operation: "upsert",
+        payload: wirePayload,
+      });
+    }
+  } else {
+    // No user context or offline; queue for later
     await enqueueSyncJob({
       entityType: "trip",
       entityId: localTrip.id,
       operation: "upsert",
       payload: wirePayload,
     });
-    await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
-    return localTrip;
   }
 
-  try {
-    const response = await apiClient.post("/trips", wirePayload);
-    const wireTrip = response as TripWire;
-    const normalized = fromWireTrip(wireTrip);
-    await upsertTrip(normalized);
-    await setItem(ACTIVE_TRIP_ID_KEY, normalized.id);
-    return normalized;
-  } catch {
-    await upsertTrip(localTrip);
-    await setItem(ACTIVE_TRIP_ID_KEY, localTrip.id);
-    await enqueueSyncJob({
-      entityType: "trip",
-      entityId: localTrip.id,
-      operation: "upsert",
-      payload: wirePayload,
-    });
-    return localTrip;
-  }
+  return localTrip;
+}
+
+export async function upsertTripWithSync(trip: Trip) {
+  return createTrip({
+    id: trip.id,
+    userId: trip.userId,
+    title: trip.title,
+    startDate: trip.startDate,
+    endDate: trip.endDate,
+    heartbeatEnabled: trip.heartbeatEnabled,
+  });
 }
 
 export async function listTrips(userId: string) {

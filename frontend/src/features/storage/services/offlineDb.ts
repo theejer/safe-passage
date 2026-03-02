@@ -437,6 +437,24 @@ export async function getTripById(tripId: string) {
   } as Trip;
 }
 
+export async function deleteItineraryByTripId(tripId: string) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM itinerary_locations WHERE trip_id = ?", [tripId]);
+    await db.runAsync("DELETE FROM itinerary_days WHERE trip_id = ?", [tripId]);
+  });
+}
+
+export async function deleteTripById(tripId: string) {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM itinerary_locations WHERE trip_id = ?", [tripId]);
+    await db.runAsync("DELETE FROM itinerary_days WHERE trip_id = ?", [tripId]);
+    await db.runAsync("DELETE FROM risk_reports WHERE trip_id = ?", [tripId]);
+    await db.runAsync("DELETE FROM trips WHERE id = ?", [tripId]);
+  });
+}
+
 export async function upsertItinerary(tripId: string, days: Day[]) {
   const db = await getDb();
   const timestamp = nowIso();
@@ -816,11 +834,12 @@ export async function getPendingSyncJobs(limit = 50) {
     `
       SELECT id, entity_type, entity_id, operation, payload_json, attempts, status, next_retry_at, created_at
       FROM sync_queue
-      WHERE status IN ('pending', 'failed')
+      WHERE status = 'pending'
+         OR (status = 'failed' AND (next_retry_at IS NULL OR next_retry_at <= ?))
       ORDER BY created_at ASC
       LIMIT ?
     `,
-    [limit]
+    [nowIso(), limit]
   );
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { Day } from "../types";
 import { DayEditor } from "./DayEditor";
@@ -17,6 +17,23 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit, sav
   const [days, setDays] = useState<Day[]>(itinerary.days);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+
+  useEffect(() => {
+    setDays(itinerary.days);
+  }, [itinerary.days]);
+
+  function addDay() {
+    const nextIndex = days.length + 1;
+    const nextDayNumber = String(nextIndex).padStart(2, "0");
+    setDays((prev) => [
+      ...prev,
+      {
+        date: `2026-01-${nextDayNumber}`,
+        accommodation: "",
+        locations: [{ name: "", district: "", block: "" }],
+      },
+    ]);
+  }
 
   if (editingIndex !== null) {
     return (
@@ -46,6 +63,9 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit, sav
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Text style={{ fontSize: 18, fontWeight: "700" }}>Extracted Itinerary ({days.length} days)</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
+          <Button block={false} size="sm" variant="outline" onPress={addDay} disabled={saving || checkingRisk}>
+            Add Day
+          </Button>
           <TouchableOpacity
             style={{
               paddingHorizontal: 12,
@@ -171,11 +191,11 @@ export function ItineraryReview({ itinerary, onConfirm, onCheckRisk, onEdit, sav
         <Button block={false} variant="outline" style={{ flex: 1 }} onPress={onEdit} disabled={saving || checkingRisk}>
           Edit File
         </Button>
-        <Button block={false} style={{ flex: 1 }} onPress={() => onConfirm(days)} disabled={saving || checkingRisk}>
-          {saving ? "Saving..." : "Save"}
+        <Button block={false} style={{ flex: 1 }} onPress={() => onConfirm(days)} loading={saving} disabled={checkingRisk}>
+          Save
         </Button>
-        <Button block={false} variant="secondary" style={{ flex: 1 }} onPress={() => onCheckRisk(days)} disabled={checkingRisk || saving}>
-          {checkingRisk ? "Checking Risk..." : "Check Risk"}
+        <Button block={false} variant="secondary" style={{ flex: 1 }} onPress={() => onCheckRisk(days)} loading={checkingRisk} disabled={saving}>
+          Check Risk
         </Button>
       </View>
     </ScrollView>

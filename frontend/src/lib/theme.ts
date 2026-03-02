@@ -4,6 +4,7 @@ export const theme = {
     background: "#ffffff",
     text: "#111111",
     danger: "#c00",
+    success: "#15803d",
     muted: "#666666",
   },
 };

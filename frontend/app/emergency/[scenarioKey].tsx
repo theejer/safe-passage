@@ -3,7 +3,6 @@ import { View, Text } from "react-native";
 import { ProtocolSteps } from "@/features/emergency/components/ProtocolSteps";
 
 export default function ScenarioProtocolScreen() {
-  // Renders a deterministic offline protocol for the selected scenario.
   const { scenarioKey } = useLocalSearchParams<{ scenarioKey: string }>();
 
   return (

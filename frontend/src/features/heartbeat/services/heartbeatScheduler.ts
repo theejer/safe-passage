@@ -14,6 +14,7 @@ import {
 } from "@/features/storage/services/offlineDb";
 import { getItem, setItem } from "@/features/storage/services/localStore";
 import {
+  isHeartbeatPermanentFailure,
   replayHeartbeatSyncJob,
   sendOrQueueHeartbeat,
   type HeartbeatPayload,
@@ -174,7 +175,12 @@ export async function replayQueuedHeartbeats() {
       await replayHeartbeatSyncJob(job);
       await markSyncJobDone(job.id);
       replayed += 1;
-    } catch {
+    } catch (error) {
+      if (isHeartbeatPermanentFailure(error)) {
+        await markSyncJobDone(job.id);
+        continue;
+      }
+
       await markSyncJobFailed(job.id, job.attempts + 1);
       failed += 1;
     }
