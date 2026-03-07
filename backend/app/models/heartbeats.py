@@ -4,15 +4,20 @@ CURE monitoring uses this table to detect delayed reconnect and trigger escalati
 """
 
 from sqlalchemy import text
+from uuid import uuid4
 
 from app.extensions import get_db_engine
 
 
 def insert_heartbeat(payload: dict) -> dict:
     """Store device heartbeat payload sent by mobile clients."""
+    params = dict(payload)
+    params.setdefault("id", str(uuid4()))
+
     query = text(
         """
         INSERT INTO heartbeats (
+            id,
             user_id,
             trip_id,
             timestamp,
@@ -26,6 +31,7 @@ def insert_heartbeat(payload: dict) -> dict:
             emergency_phone
         )
         VALUES (
+            :id,
             :user_id,
             :trip_id,
             :timestamp,
@@ -43,7 +49,7 @@ def insert_heartbeat(payload: dict) -> dict:
     )
 
     with get_db_engine().begin() as connection:
-        row = connection.execute(query, payload).mappings().first()
+        row = connection.execute(query, params).mappings().first()
 
     return dict(row) if row else {}
 

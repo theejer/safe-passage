@@ -176,6 +176,78 @@ Notes:
 .\.venv\Scripts\python.exe -m pytest tests -q
 ```
 
+### Run performance tests
+
+The backend includes a comprehensive performance test suite that measures algorithm efficiency and code execution speed for critical heartbeat monitoring and emergency escalation systems.
+
+**Quick start:**
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe run_performance_tests.py --all
+```
+
+**Test categories:**
+
+```powershell
+# Run all tests
+.\.venv\Scripts\python.exe run_performance_tests.py --all
+
+# Run specific categories
+.\.venv\Scripts\python.exe run_performance_tests.py --load         # Heartbeat ingestion
+.\.venv\Scripts\python.exe run_performance_tests.py --watchdog     # Watchdog cycle scalability
+.\.venv\Scripts\python.exe run_performance_tests.py --escalation   # Emergency escalation workflow
+.\.venv\Scripts\python.exe run_performance_tests.py --alerts       # Alert delivery testing
+
+# Multiple categories
+.\.venv\Scripts\python.exe run_performance_tests.py --load --watchdog --escalation
+
+# Help and options
+.\.venv\Scripts\python.exe run_performance_tests.py --help
+```
+
+**What the tests measure:**
+
+These tests measure **algorithm efficiency and code execution speed** using:
+- **Synthetic data generation**: Test users, trips, and heartbeats created in-memory
+- **Mocked database**: In-memory dictionary-based storage (no actual PostgreSQL I/O)
+- **Mocked external services**: HTTP calls to Telegram API and other services are intercepted
+- **Real production code**: Actual functions from `app.services` and `app.models` are executed
+
+**Important limitations:**
+
+⚠️ **These tests do NOT measure production performance.** They validate:
+- Code correctness and logic flow
+- Algorithm efficiency without I/O overhead
+- Memory usage patterns
+- Error handling robustness
+
+**What is NOT measured:**
+- Real database query latency (PostgreSQL connection overhead, network I/O)
+- Actual HTTP request/response times
+- Production infrastructure constraints (CPU, memory, network)
+- Real-world concurrency and connection pooling behavior
+
+**Realistic production estimates:**
+
+| Metric | Test Result (Mocked) | Production Estimate (Real I/O) |
+|--------|---------------------|--------------------------------|
+| Heartbeat ingestion latency | 0.12ms | 15-40ms |
+| Watchdog cycle (1000 trips) | 2ms | 7-20 seconds |
+| Alert delivery | 3-5ms | 250-3000ms |
+| Throughput | 6000+ req/sec | 100-300 req/sec |
+
+**Test output:**
+
+Results are saved to `backend/test_results/`:
+- `performance_YYYYMMDD_HHMMSS.json` - Detailed metrics in JSON format
+- `performance_report.html` - Interactive HTML dashboard
+
+**Exit codes:**
+- `0` - All tests passed
+- `1` - One or more tests failed
+- `2` - Tests passed with warnings
+
 ### Run end-to-end smoke flow (API + DB)
 
 1) Start backend in one terminal:

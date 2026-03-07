@@ -1,0 +1,421 @@
+{
+  "timestamp": "2026-03-07T04:34:01.932899",
+  "duration_seconds": 10.10653,
+  "summary": {
+    "total_tests": 21,
+    "passed": 21,
+    "failed": 0,
+    "warnings": 0,
+    "errors": 0,
+    "duration_seconds": 10.10653
+  },
+  "metrics": {
+    "connectivity": {
+      "accuracy": {
+        "value": 0.7666666666666667,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:03.560750"
+      },
+      "prediction_latency_p50_ms": {
+        "value": 9.019399999942834,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_p95_ms": {
+        "value": 25.799074999667926,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_p99_ms": {
+        "value": 26.88495600014903,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_mean_ms": {
+        "value": 11.532649374989509,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_min_ms": {
+        "value": 8.65380000004734,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_max_ms": {
+        "value": 29.41340000006676,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "prediction_latency_count": {
+        "value": 480,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "latency_p99_ms": {
+        "value": 26.88495600014903,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:09.097115"
+      },
+      "confidence_correlation": {
+        "value": 1.0000000000000002,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:09.795420"
+      },
+      "fallback_frequency": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:10.714747"
+      },
+      "exact_group_match_rate": {
+        "value": 0.7666666666666667,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:10.715809"
+      }
+    },
+    "heartbeat_load": {
+      "baseline_latency_ms": {
+        "value": 0.14880000007906344,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.049075"
+      },
+      "latency_50_concurrent_p50_ms": {
+        "value": 0.08880000018507417,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_p95_ms": {
+        "value": 0.15463500030818977,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_p99_ms": {
+        "value": 0.20030100009535054,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_mean_ms": {
+        "value": 0.09804800002939373,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_min_ms": {
+        "value": 0.0708000002305198,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_max_ms": {
+        "value": 0.2764999999271822,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_50_concurrent_count": {
+        "value": 200,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.077076"
+      },
+      "latency_100_concurrent_p50_ms": {
+        "value": 0.09885000008580391,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_p95_ms": {
+        "value": 0.16081500023119588,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_p99_ms": {
+        "value": 0.1864249996242506,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_mean_ms": {
+        "value": 0.10625100000349146,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_min_ms": {
+        "value": 0.0729000003047986,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_max_ms": {
+        "value": 0.21320000041669118,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "latency_100_concurrent_count": {
+        "value": 300,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "throughput_per_sec": {
+        "value": 6602.926416991431,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      },
+      "error_rate": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.123075"
+      }
+    },
+    "watchdog": {
+      "duration_100_trips_sec": {
+        "value": 0.00020180000001346343,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.124076"
+      },
+      "duration_500_trips_sec": {
+        "value": 0.0009405000000697328,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.128076"
+      },
+      "duration_1000_trips_sec": {
+        "value": 0.0018376500001977547,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_p50_ms": {
+        "value": 0.0018810000001394656,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_p95_ms": {
+        "value": 0.0020043000001351173,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_p99_ms": {
+        "value": 0.002015260000134731,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_mean_ms": {
+        "value": 0.0019122166668239515,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_min_ms": {
+        "value": 0.0018376500001977547,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_max_ms": {
+        "value": 0.0020180000001346343,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "per_trip_count": {
+        "value": 3,
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:11.134702"
+      },
+      "peak_memory_mb": {
+        "value": 1.2679052352905273,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.168633"
+      }
+    },
+    "escalation": {
+      "stage_transition_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.169632"
+      },
+      "false_positive_rate": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.169632"
+      },
+      "rearm_enforcement": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.169632"
+      },
+      "dedup_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:11.169632"
+      }
+    },
+    "alert_delivery": {
+      "delivery_success_rate": {
+        "value": 0.9772727272727273,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:12.037102"
+      },
+      "delivery_p50_sec": {
+        "value": 0.0036383499998464686,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:12.037102"
+      },
+      "delivery_p95_sec": {
+        "value": 0.005254079999963323,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:12.037102"
+      },
+      "storm_dedup_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:34:12.039117"
+      }
+    },
+    "e2e": {
+      "status": {
+        "value": "pending",
+        "passed": null,
+        "timestamp": "2026-03-07T04:34:12.039117"
+      }
+    }
+  },
+  "test_results": [
+    {
+      "test_name": "connectivity_accuracy",
+      "passed": true,
+      "duration_sec": 1.6265769999999975,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:03.560750"
+    },
+    {
+      "test_name": "connectivity_latency",
+      "passed": true,
+      "duration_sec": 5.535882700000002,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:09.097115"
+    },
+    {
+      "test_name": "connectivity_confidence_calibration",
+      "passed": true,
+      "duration_sec": 0.6985005999999885,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:09.795420"
+    },
+    {
+      "test_name": "connectivity_fallback_frequency",
+      "passed": true,
+      "duration_sec": 0.9194487999998273,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:10.714747"
+    },
+    {
+      "test_name": "heartbeat_baseline_latency",
+      "passed": true,
+      "duration_sec": 0.008261200000106328,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.049075"
+    },
+    {
+      "test_name": "heartbeat_p95_50_concurrent",
+      "passed": true,
+      "duration_sec": 0.027103299999907904,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.077076"
+    },
+    {
+      "test_name": "heartbeat_p95_100_concurrent",
+      "passed": true,
+      "duration_sec": 0.04543439999997645,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.123075"
+    },
+    {
+      "test_name": "heartbeat_throughput",
+      "passed": true,
+      "duration_sec": 0.04543439999997645,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.123075"
+    },
+    {
+      "test_name": "heartbeat_error_rate",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.123075"
+    },
+    {
+      "test_name": "watchdog_duration_100",
+      "passed": true,
+      "duration_sec": 0.00020180000001346343,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.124076"
+    },
+    {
+      "test_name": "watchdog_duration_500",
+      "passed": true,
+      "duration_sec": 0.0009405000000697328,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.128076"
+    },
+    {
+      "test_name": "watchdog_duration_1000",
+      "passed": true,
+      "duration_sec": 0.0018376500001977547,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.134702"
+    },
+    {
+      "test_name": "watchdog_per_trip_p95",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.134702"
+    },
+    {
+      "test_name": "watchdog_peak_memory",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.168633"
+    },
+    {
+      "test_name": "escalation_stage_transition_accuracy",
+      "passed": true,
+      "duration_sec": 8.759999991525547e-05,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.169632"
+    },
+    {
+      "test_name": "escalation_false_positive_rate",
+      "passed": true,
+      "duration_sec": 0.0001443999999537482,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.169632"
+    },
+    {
+      "test_name": "escalation_rearm_enforcement",
+      "passed": true,
+      "duration_sec": 1.3700000181415817e-05,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.169632"
+    },
+    {
+      "test_name": "escalation_dedup_accuracy",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:11.169632"
+    },
+    {
+      "test_name": "alert_delivery_success_rate",
+      "passed": true,
+      "duration_sec": 0.8665342000003875,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:12.037102"
+    },
+    {
+      "test_name": "alert_delivery_latency",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:12.037102"
+    },
+    {
+      "test_name": "alert_delivery_storm_dedup",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:34:12.039117"
+    }
+  ],
+  "errors": []
+}

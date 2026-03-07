@@ -260,6 +260,38 @@ pytest tests/test_connectivity_model.py
 pytest tests/test_heartbeat_monitor.py
 ```
 
+### Performance Tests
+
+The backend includes a comprehensive performance test suite for heartbeat monitoring and emergency escalation systems:
+
+```powershell
+cd backend
+
+# Run all performance tests
+python run_performance_tests.py --all
+
+# Run specific test categories
+python run_performance_tests.py --load          # Heartbeat ingestion
+python run_performance_tests.py --watchdog      # Watchdog scalability
+python run_performance_tests.py --escalation    # Emergency escalation
+python run_performance_tests.py --alerts        # Alert delivery
+
+# View help and all options
+python run_performance_tests.py --help
+```
+
+**What these tests measure:**
+- ✓ Code correctness and algorithm logic
+- ✓ Memory usage patterns
+- ✓ Error handling robustness
+- ✓ Concurrent execution behavior
+
+**Important:** These tests use mocked I/O (in-memory database, intercepted network calls) to validate code quality.
+
+**Test output:**
+- JSON results: `backend/test_results/performance_YYYYMMDD_HHMMSS.json`
+- HTML dashboard: `backend/test_results/performance_report.html`
+
 ### Frontend Type Checking
 
 ```bash

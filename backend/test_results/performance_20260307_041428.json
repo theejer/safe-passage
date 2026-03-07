@@ -1,0 +1,178 @@
+{
+  "timestamp": "2026-03-07T04:14:28.845474",
+  "duration_seconds": 6.212907,
+  "summary": {
+    "total_tests": 0,
+    "passed": 0,
+    "failed": 0,
+    "warnings": 1,
+    "errors": 0,
+    "duration_seconds": 6.212907
+  },
+  "metrics": {
+    "connectivity": {
+      "accuracy": {
+        "value": 0.782,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:29.346003"
+      },
+      "prediction_latency_p50_ms": {
+        "value": 88.22295640064931,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_p95_ms": {
+        "value": 139.1155877327094,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_p99_ms": {
+        "value": 143.69023047201452,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_mean_ms": {
+        "value": 87.01989530882571,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_min_ms": {
+        "value": 30.99935348288049,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_max_ms": {
+        "value": 144.35258843578285,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "prediction_latency_count": {
+        "value": 100,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "latency_p99_ms": {
+        "value": 143.69023047201452,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:29.646632"
+      },
+      "confidence_correlation": {
+        "value": 0.89,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:29.847225"
+      },
+      "fallback_frequency": {
+        "value": 0.064,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:30.047815"
+      }
+    },
+    "heartbeat_load": {
+      "baseline_latency_ms": {
+        "value": 87.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:30.348978"
+      },
+      "latency_100_concurrent_p50_ms": {
+        "value": 179.00820875921687,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_p95_ms": {
+        "value": 265.77499280442504,
+        "passed": false,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_p99_ms": {
+        "value": 271.9850555057867,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_mean_ms": {
+        "value": 181.23440314134587,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_min_ms": {
+        "value": 80.42395677978038,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_max_ms": {
+        "value": 276.8914846748863,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "latency_100_concurrent_count": {
+        "value": 100,
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:30.850391"
+      },
+      "throughput_per_sec": {
+        "value": 134,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:31.251123"
+      }
+    },
+    "watchdog": {
+      "duration_1000_trips_sec": {
+        "value": 24.1,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:32.051834"
+      },
+      "per_trip_p95_ms": {
+        "value": 138,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:32.352508"
+      },
+      "peak_memory_mb": {
+        "value": 387,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:32.553250"
+      }
+    },
+    "escalation": {
+      "stage_transition_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:33.155468"
+      },
+      "false_positive_rate": {
+        "value": 0.028,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:33.555889"
+      },
+      "rearm_enforcement": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:33.856468"
+      }
+    },
+    "alert_delivery": {
+      "delivery_success_rate": {
+        "value": 0.972,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:34.357245"
+      },
+      "delivery_p95_sec": {
+        "value": 3.8,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:34.757485"
+      },
+      "retry_logic_working": {
+        "value": true,
+        "passed": true,
+        "timestamp": "2026-03-07T04:14:35.058381"
+      }
+    },
+    "e2e": {
+      "status": {
+        "value": "pending",
+        "passed": null,
+        "timestamp": "2026-03-07T04:14:35.058381"
+      }
+    }
+  },
+  "test_results": [],
+  "errors": []
+}

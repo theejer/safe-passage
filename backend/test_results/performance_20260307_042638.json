@@ -1,0 +1,379 @@
+{
+  "timestamp": "2026-03-07T04:26:38.467520",
+  "duration_seconds": 13.411851,
+  "summary": {
+    "total_tests": 17,
+    "passed": 15,
+    "failed": 2,
+    "warnings": 2,
+    "errors": 1,
+    "duration_seconds": 13.411851
+  },
+  "metrics": {
+    "connectivity": {
+      "accuracy": {
+        "value": 0.7666666666666667,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:40.125818"
+      },
+      "prediction_latency_p50_ms": {
+        "value": 9.072250000144777,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_p95_ms": {
+        "value": 26.300975000003746,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_p99_ms": {
+        "value": 27.8318820001823,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_mean_ms": {
+        "value": 11.732580208339035,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_min_ms": {
+        "value": 8.60529999999926,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_max_ms": {
+        "value": 30.263600000125734,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "prediction_latency_count": {
+        "value": 480,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "latency_p99_ms": {
+        "value": 27.8318820001823,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "confidence_correlation": {
+        "value": 0.0,
+        "passed": false,
+        "timestamp": "2026-03-07T04:26:45.757442"
+      },
+      "fallback_frequency": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:46.699644"
+      },
+      "exact_group_match_rate": {
+        "value": 0.7666666666666667,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:46.700727"
+      }
+    },
+    "heartbeat_load": {
+      "baseline_latency_ms": {
+        "value": 0.1192150002452763,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.310696"
+      },
+      "latency_50_concurrent_p50_ms": {
+        "value": 0.09595000028639333,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_p95_ms": {
+        "value": 0.19024999976409154,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_p99_ms": {
+        "value": 0.3020880000440222,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_mean_ms": {
+        "value": 0.11097599998720398,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_min_ms": {
+        "value": 0.0708000002305198,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_max_ms": {
+        "value": 0.5020999997213949,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_50_concurrent_count": {
+        "value": 200,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.340765"
+      },
+      "latency_100_concurrent_p50_ms": {
+        "value": 0.09864999992714729,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_p95_ms": {
+        "value": 0.16502999992553669,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_p99_ms": {
+        "value": 0.1805480003076805,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_mean_ms": {
+        "value": 0.10893400001502111,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_min_ms": {
+        "value": 0.0749000000723754,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_max_ms": {
+        "value": 0.6122999998297018,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "latency_100_concurrent_count": {
+        "value": 300,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "throughput_per_sec": {
+        "value": 6546.444843969902,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      },
+      "error_rate": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.387860"
+      }
+    },
+    "watchdog": {
+      "duration_100_trips_sec": {
+        "value": 0.013027899999997317,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.414941"
+      },
+      "duration_500_trips_sec": {
+        "value": 0.07461340000008931,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.566220"
+      },
+      "duration_1000_trips_sec": {
+        "value": 0.11695499999996173,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_p50_ms": {
+        "value": 0.13027899999997317,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_p95_ms": {
+        "value": 0.14733202000015808,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_p99_ms": {
+        "value": 0.14884784400017453,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_mean_ms": {
+        "value": 0.13215360000003784,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_min_ms": {
+        "value": 0.11695499999996173,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_max_ms": {
+        "value": 0.14922680000017863,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "per_trip_count": {
+        "value": 3,
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:50.802901"
+      },
+      "peak_memory_mb": {
+        "value": 1.833695411682129,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:51.047142"
+      }
+    },
+    "escalation": {},
+    "alert_delivery": {
+      "delivery_success_rate": {
+        "value": 0.9772727272727273,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:51.877368"
+      },
+      "delivery_p50_sec": {
+        "value": 0.0036410000000159926,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:51.877368"
+      },
+      "delivery_p95_sec": {
+        "value": 0.005121540000141067,
+        "passed": true,
+        "timestamp": "2026-03-07T04:26:51.877368"
+      },
+      "storm_dedup_accuracy": {
+        "value": 0.0,
+        "passed": false,
+        "timestamp": "2026-03-07T04:26:51.878371"
+      }
+    },
+    "e2e": {
+      "status": {
+        "value": "pending",
+        "passed": null,
+        "timestamp": "2026-03-07T04:26:51.879371"
+      }
+    }
+  },
+  "test_results": [
+    {
+      "test_name": "connectivity_accuracy",
+      "passed": true,
+      "duration_sec": 1.656696699999884,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:40.125818"
+    },
+    {
+      "test_name": "connectivity_latency",
+      "passed": true,
+      "duration_sec": 5.63184339999998,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:45.757442"
+    },
+    {
+      "test_name": "connectivity_confidence_calibration",
+      "passed": false,
+      "duration_sec": 0.0001395999997839681,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:45.758436"
+    },
+    {
+      "test_name": "connectivity_fallback_frequency",
+      "passed": true,
+      "duration_sec": 0.9421333999998751,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:46.699644"
+    },
+    {
+      "test_name": "heartbeat_baseline_latency",
+      "passed": true,
+      "duration_sec": 0.017786099999739235,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.310696"
+    },
+    {
+      "test_name": "heartbeat_p95_50_concurrent",
+      "passed": true,
+      "duration_sec": 0.02998180000031425,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.340765"
+    },
+    {
+      "test_name": "heartbeat_p95_100_concurrent",
+      "passed": true,
+      "duration_sec": 0.045826400000350986,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.387860"
+    },
+    {
+      "test_name": "heartbeat_throughput",
+      "passed": true,
+      "duration_sec": 0.045826400000350986,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.387860"
+    },
+    {
+      "test_name": "heartbeat_error_rate",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.387860"
+    },
+    {
+      "test_name": "watchdog_duration_100",
+      "passed": true,
+      "duration_sec": 0.013027899999997317,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.414941"
+    },
+    {
+      "test_name": "watchdog_duration_500",
+      "passed": true,
+      "duration_sec": 0.07461340000008931,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.566220"
+    },
+    {
+      "test_name": "watchdog_duration_1000",
+      "passed": true,
+      "duration_sec": 0.11695499999996173,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.802901"
+    },
+    {
+      "test_name": "watchdog_per_trip_p95",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:50.802901"
+    },
+    {
+      "test_name": "watchdog_peak_memory",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:51.047142"
+    },
+    {
+      "test_name": "alert_delivery_success_rate",
+      "passed": true,
+      "duration_sec": 0.8285237999998571,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:51.877368"
+    },
+    {
+      "test_name": "alert_delivery_latency",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:51.877368"
+    },
+    {
+      "test_name": "alert_delivery_storm_dedup",
+      "passed": false,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:26:51.878371"
+    }
+  ],
+  "errors": [
+    {
+      "category": "Emergency Escalation Tests",
+      "error": "run_demo_escalation_tests.<locals>._has_recent_stage_alert() got an unexpected keyword argument 'within_minutes'",
+      "details": null,
+      "timestamp": "2026-03-07T04:26:51.048117"
+    }
+  ]
+}

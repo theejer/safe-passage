@@ -1,0 +1,421 @@
+{
+  "timestamp": "2026-03-07T04:29:52.761893",
+  "duration_seconds": 9.399345,
+  "summary": {
+    "total_tests": 21,
+    "passed": 20,
+    "failed": 1,
+    "warnings": 1,
+    "errors": 0,
+    "duration_seconds": 9.399345
+  },
+  "metrics": {
+    "connectivity": {
+      "accuracy": {
+        "value": 0.7666666666666667,
+        "passed": true,
+        "timestamp": "2026-03-07T04:29:54.404023"
+      },
+      "prediction_latency_p50_ms": {
+        "value": 8.951849999903061,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_p95_ms": {
+        "value": 25.27606999994987,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_p99_ms": {
+        "value": 27.052060000078185,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_mean_ms": {
+        "value": 11.451711041664225,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_min_ms": {
+        "value": 8.585799999764276,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_max_ms": {
+        "value": 30.0068999999894,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "prediction_latency_count": {
+        "value": 480,
+        "passed": null,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "latency_p99_ms": {
+        "value": 27.052060000078185,
+        "passed": true,
+        "timestamp": "2026-03-07T04:29:59.902314"
+      },
+      "confidence_correlation": {
+        "value": 0.0,
+        "passed": false,
+        "timestamp": "2026-03-07T04:29:59.902384"
+      },
+      "fallback_frequency": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:00.827281"
+      },
+      "exact_group_match_rate": {
+        "value": 0.7666666666666667,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:00.827281"
+      }
+    },
+    "heartbeat_load": {
+      "baseline_latency_ms": {
+        "value": 0.11622000031366042,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.166129"
+      },
+      "latency_50_concurrent_p50_ms": {
+        "value": 0.09599999998499698,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_p95_ms": {
+        "value": 0.1718200000141223,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_p99_ms": {
+        "value": 0.3178219998153494,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_mean_ms": {
+        "value": 0.11273600000322404,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_min_ms": {
+        "value": 0.07210000012491946,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_max_ms": {
+        "value": 1.0840999998436018,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_50_concurrent_count": {
+        "value": 200,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.197129"
+      },
+      "latency_100_concurrent_p50_ms": {
+        "value": 0.10115000031873933,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_p95_ms": {
+        "value": 0.16540999995413588,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_p99_ms": {
+        "value": 0.20545299983496065,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_mean_ms": {
+        "value": 0.11068866666543424,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_min_ms": {
+        "value": 0.07450000020980951,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_max_ms": {
+        "value": 0.3685000001496519,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "latency_100_concurrent_count": {
+        "value": 300,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "throughput_per_sec": {
+        "value": 6305.740115176581,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      },
+      "error_rate": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.246130"
+      }
+    },
+    "watchdog": {
+      "duration_100_trips_sec": {
+        "value": 0.00020370000015645928,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.247129"
+      },
+      "duration_500_trips_sec": {
+        "value": 0.0009324500001639535,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.250129"
+      },
+      "duration_1000_trips_sec": {
+        "value": 0.0018370999998751358,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_p50_ms": {
+        "value": 0.001864900000327907,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_p95_ms": {
+        "value": 0.0020197900014409242,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_p99_ms": {
+        "value": 0.002033558001539859,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_mean_ms": {
+        "value": 0.0019130000005892118,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_min_ms": {
+        "value": 0.0018370999998751358,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_max_ms": {
+        "value": 0.002037000001564593,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "per_trip_count": {
+        "value": 3,
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:01.257128"
+      },
+      "peak_memory_mb": {
+        "value": 1.2682390213012695,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.292153"
+      }
+    },
+    "escalation": {
+      "stage_transition_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.293146"
+      },
+      "false_positive_rate": {
+        "value": 0.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.295146"
+      },
+      "rearm_enforcement": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.295146"
+      },
+      "dedup_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:01.295146"
+      }
+    },
+    "alert_delivery": {
+      "delivery_success_rate": {
+        "value": 0.9772727272727273,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:02.158187"
+      },
+      "delivery_p50_sec": {
+        "value": 0.003634250000004613,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:02.158187"
+      },
+      "delivery_p95_sec": {
+        "value": 0.005246344999841312,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:02.158187"
+      },
+      "storm_dedup_accuracy": {
+        "value": 1.0,
+        "passed": true,
+        "timestamp": "2026-03-07T04:30:02.160238"
+      }
+    },
+    "e2e": {
+      "status": {
+        "value": "pending",
+        "passed": null,
+        "timestamp": "2026-03-07T04:30:02.160238"
+      }
+    }
+  },
+  "test_results": [
+    {
+      "test_name": "connectivity_accuracy",
+      "passed": true,
+      "duration_sec": 1.6416361000001416,
+      "details": null,
+      "timestamp": "2026-03-07T04:29:54.404023"
+    },
+    {
+      "test_name": "connectivity_latency",
+      "passed": true,
+      "duration_sec": 5.497030900000027,
+      "details": null,
+      "timestamp": "2026-03-07T04:29:59.902314"
+    },
+    {
+      "test_name": "connectivity_confidence_calibration",
+      "passed": false,
+      "duration_sec": 0.00011939999967580661,
+      "details": null,
+      "timestamp": "2026-03-07T04:29:59.902384"
+    },
+    {
+      "test_name": "connectivity_fallback_frequency",
+      "passed": true,
+      "duration_sec": 0.9251251999999113,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:00.827281"
+    },
+    {
+      "test_name": "heartbeat_baseline_latency",
+      "passed": true,
+      "duration_sec": 0.007907100000011269,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.166129"
+    },
+    {
+      "test_name": "heartbeat_p95_50_concurrent",
+      "passed": true,
+      "duration_sec": 0.0302998000001935,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.197129"
+    },
+    {
+      "test_name": "heartbeat_p95_100_concurrent",
+      "passed": true,
+      "duration_sec": 0.047575700000379584,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.246130"
+    },
+    {
+      "test_name": "heartbeat_throughput",
+      "passed": true,
+      "duration_sec": 0.047575700000379584,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.246130"
+    },
+    {
+      "test_name": "heartbeat_error_rate",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.246130"
+    },
+    {
+      "test_name": "watchdog_duration_100",
+      "passed": true,
+      "duration_sec": 0.00020370000015645928,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.247129"
+    },
+    {
+      "test_name": "watchdog_duration_500",
+      "passed": true,
+      "duration_sec": 0.0009324500001639535,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.250129"
+    },
+    {
+      "test_name": "watchdog_duration_1000",
+      "passed": true,
+      "duration_sec": 0.0018370999998751358,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.257128"
+    },
+    {
+      "test_name": "watchdog_per_trip_p95",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.257128"
+    },
+    {
+      "test_name": "watchdog_peak_memory",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.292153"
+    },
+    {
+      "test_name": "escalation_stage_transition_accuracy",
+      "passed": true,
+      "duration_sec": 7.310000000870787e-05,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.293146"
+    },
+    {
+      "test_name": "escalation_false_positive_rate",
+      "passed": true,
+      "duration_sec": 0.00268740000001344,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.295146"
+    },
+    {
+      "test_name": "escalation_rearm_enforcement",
+      "passed": true,
+      "duration_sec": 2.5400000140507473e-05,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.295146"
+    },
+    {
+      "test_name": "escalation_dedup_accuracy",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:01.295146"
+    },
+    {
+      "test_name": "alert_delivery_success_rate",
+      "passed": true,
+      "duration_sec": 0.8621815999999853,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:02.158187"
+    },
+    {
+      "test_name": "alert_delivery_latency",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:02.158187"
+    },
+    {
+      "test_name": "alert_delivery_storm_dedup",
+      "passed": true,
+      "duration_sec": 0.0,
+      "details": null,
+      "timestamp": "2026-03-07T04:30:02.160238"
+    }
+  ],
+  "errors": []
+}
